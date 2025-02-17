@@ -1,5 +1,6 @@
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
 Measures = "442fdcdd-2543-5da2-b0f3-8c86c306513e"
