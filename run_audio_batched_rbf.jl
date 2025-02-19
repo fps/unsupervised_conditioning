@@ -110,15 +110,8 @@ for m in 1:5000;
         for (basis, x, y) in data_loader
             print(".")
             the_loss, the_grads = Flux.withgradient([model, latent_params]) do params
-                # latent = basis * params[2]
                 latent = hcat([(params[2][n:n,:] * basis[:,n,:])' for n in 1:size(latent_params, 1)]...)
-                # latent = i2r.(params[2] * basis)'
-                # print(size(latent))
-                loss(params[1], repeat(cat(x, latent, dims=2), 1, 1, 1), y) # + 1f2 * (sum(i2r(params[2][:,1]).^2) + sum(i2r.(params[2][1, 2:10]).^2) + sum(i2r.(params[2][2, 8:end]).^2))# + 0.001f0 * sum((eye .- g(cov(latent))).^2) # + 0.00001f0 * (latent[:,1]' * latent[:,2])^2.0f0 # + 0.00001f0 * Statistics.mean(latent).^2.0f0 # + 0.00000001 * sum((1.0f0 .- Statistics.var(latent, dims=2))).^2# + 0.00001 * sum(abs.(latent)) # #  # + 10.0f0 * Statistics.mean(diff(latent, dims=1).^2)# 0.01f0 * Statistics.mean(latent.^2) #  + 1.0f0 * (1.0f0 - Statistics.var(latent)).^2 + Statistics.mean(latent.^2) + 0.1f0*(latent[:,1]' * latent[:,2])^2.0f0 # + 0.1f0 * (1.0f0 - Statistics.var(latent)).^2 + 0.1f0*(latent[:,1]' * latent[:,2])^2.0f0
-                # + sum(([1 0] .- latent[1,:]).^2)
-                    
-                #LinearAlgebra.norm(Statistics.cor(latent, dims=1) - [1 0; 0 1])
-                #  + Statistics.mean(diff(latent, dims=1).^2) + Statistics.mean(latent).^2 + (1 - Statistics.var(latent)).^2
+                loss(params[1], repeat(cat(x, latent, dims=2), 1, 1, 1), y)
             end
             push!(losses, the_loss)
             
@@ -127,15 +120,11 @@ for m in 1:5000;
     end; 
     display((m, Statistics.mean(losses)))
     
-    # latent = hcat([basis[:,:,n] * latent_params[:,n] for n in 1:size(latent_params, 2)]...)
     latent = hcat([(latent_params[n:n,:] * basis[:,n,:])' for n in 1:size(latent_params, 1)]...)
-    #  latent = i2r.(latent_params * basis)'
 
     
     Plots.plot(
         Plots.plot(x[:,1,1] |> c, title="Training input", legend=:none), 
-        # Plots.plot(control1[:,:,1] |> c, title="Control 1", legend=:none),
-        # Plots.plot(control2[:,:,1] |> c, title="Control 2", legend=:none),
         Plots.plot(y[:,1,1] |> c, title="Training output", legend=:none),
         Plots.plot(model(repeat(cat(x, latent, dims=2), 1, 1, 1))[:,1,1] |> c, title="Model output", legend=:none),
         [ Plots.plot((latent)[:,n,1] |> c, title="Inferred control input $(n)", legend=:none) for n in 1:num_latent_variables]...,
