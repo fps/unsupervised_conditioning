@@ -47,17 +47,18 @@ function gaussian(center, sigma, t)
 end
 
 function mexican_hat(center, sigma, t)
-   (1 .- (t ./ sigma).^2) .* exp.(-t.^2 ./ (2*sigma^2))
+   (1 .- ((t .- center) ./ sigma).^2) .* exp.(-(t .- center).^2 ./ (2*sigma^2))
 end
 
 
 num_basis_functions = 40 * T
 
-sigmas = [1/30, 1/10]
+sigmas = [1/40, 1/10]
+basis_functions = [mexican_hat, gaussian]
 
 num_latent_variables = length(sigmas)
 
-basis = Float32.([exp.(-(t.-center).^2 ./ sigma^2) for center in T .* (0:(1/(num_basis_functions-1)):1), sigma in sigmas, t in t]) |> g
+basis = Float32.([f(center, sigma, t) for center in T .* (0:(1/(num_basis_functions-1)):1), (sigma, f) in zip(sigmas, basis_functions), t in t]) |> g
 # for n in 1:size(basis, 2)
 #     basis[:,n,:] = basis[:,n,:] ./ sum(basis[:,n,:], dims=1)
 # end
