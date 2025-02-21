@@ -13,6 +13,7 @@ import Statistics
 import LinearAlgebra
 
 import Random
+import Profile
 
 
 println("Initial setup...")
@@ -34,7 +35,7 @@ blocksize = 1000
 
 t = 0:(1/FS):(T-(1/FS))
 
-t_blocks = reshape(t, 1000, :)
+t_blocks = reshape(t, blocksize, :)
 
 N_data = length(t)
 
@@ -62,7 +63,7 @@ println("Dividing data into blocks...")
 x_blocks = reshape(x, blocksize, :)
 y_blocks = reshape(y, blocksize, :)
 # basis_blocks = reshape(permutedims(basis,(1, 3, 2)), length(sigmas), blocksize, num_basis_functions, :)
-basis_blocks = cat([basis[:,start:(start+blocksize-1),:] for start in 1:blocksize:96000]..., dims=4)
+basis_blocks = cat([basis[:,start:(start+blocksize-1),:] for start in 1:blocksize:N_data]..., dims=4)
 # basis_blocks = Float32.(
 
 
@@ -83,7 +84,8 @@ loss(m, x, y) = Flux.Losses.mse(m(x), y)
 
 println("Entering training loop...")
 
-for m in 1:5000;
+# Profile.@profile 
+for m in 1:20;
     latent = hcat([(latent_params[n:n,:] * basis[n,:,:]')' for n in 1:size(latent_params, 1)]...)
     
     Plots.plot(
@@ -101,7 +103,7 @@ for m in 1:5000;
     ) |> display
 
     losses = []
-    for n in 1:50; 
+    for n in 1:10; 
         batchsize = 5
         data_loader = Flux.MLUtils.DataLoader((x_blocks, y_blocks, basis_blocks), batchsize=batchsize, shuffle=true)
         print("<")
