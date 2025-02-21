@@ -35,7 +35,7 @@ blocksize = 1000
 
 t = 0:(1/FS):(T-(1/FS))
 
-t_blocks = reshape(t, blocksize, :)
+t_blocks = reshape(t, blocksize, :) |> g
 
 N_data = length(t)
 
@@ -125,6 +125,6 @@ for m in 1:20;
             Flux.update!(opt, [model, latent_params], the_grads[1])
         end
         print(">")
-    end; 
+    end
     display((m, Statistics.mean(losses)))
 end
