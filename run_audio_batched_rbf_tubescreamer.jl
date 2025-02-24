@@ -60,7 +60,7 @@ println("Creating basis functions...")
 basis_functions_per_second = 5
 num_basis_functions = Int(floor(basis_functions_per_second * T))
 
-sigmas = Float32.([30, 0.25]) |> g
+sigmas = Float32.([10, 0.25]) |> g
 
 basis_functions = [mexican_hat, mexican_hat]
 
