@@ -2,7 +2,7 @@
 
 julia_version = "1.11.3"
 manifest_format = "2.0"
-project_hash = "ef4dc547053112ed739498004af2153ae91b1a67"
+project_hash = "87a96689103ae3f9ded682b15b5e40c90cf24f7f"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1538,6 +1538,13 @@ deps = ["PrecompileTools"]
 git-tree-sha1 = "fea870727142270bdf7624ad675901a1ee3b4c87"
 uuid = "fdea26ae-647d-5447-a871-4b548cad5224"
 version = "3.7.1"
+
+[[deps.SVF]]
+git-tree-sha1 = "f9cc632a269bf27e6f07812cd0117aa67ab2ce42"
+repo-rev = "master"
+repo-url = "https://github.com/fps/SVF.jl.git"
+uuid = "e4974282-f47c-4920-baad-a3ebf6911431"
+version = "0.0.1"
 
 [[deps.ScopedValues]]
 deps = ["HashArrayMappedTries", "Logging"]
