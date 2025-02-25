@@ -4,11 +4,11 @@ function cov(x)
     [sum( (x[:,i] .- m[i]) .* (x[:,j] .- m[j])) for i in 1:size(x, 2), j in 1:size(x,2)] ./ (size(x,1) - 1)
 end
 
-eye = zeros(Float32, num_latent_variables, num_latent_variables)
-for i in 1:num_latent_variables
-    eye[i,i] = 1.0f0
-end
-eye = g(eye)
+# eye = zeros(Float32, num_latent_variables, num_latent_variables)
+# for i in 1:num_latent_variables
+#     eye[i,i] = 1.0f0
+# end
+# eye = g(eye)
 
 function i2r(x)
     real.(x) .+ imag.(x)
