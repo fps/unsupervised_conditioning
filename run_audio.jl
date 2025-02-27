@@ -8,6 +8,7 @@ import Measures
 
 import Flux
 import CUDA
+import Random
 
 import Statistics
 import LinearAlgebra

@@ -38,7 +38,8 @@ x = randn(N_data) |> g
 
 # y = tanh.(5 .* sin.(2*pi*3.1 .* t) .* sin.(2*pi*freq .* t)) .+ sin.(2*pi*10.8 .* t) 
 
-control1 = 0.5f0 .* sin.(2*pi*1.1*t.+0.1) .+ 1.0f0 |> g
+# control1 = 0.5f0 .* sin.(2*pi*1.1*t.+0.1) .+ 1.0f0 |> g
+control1 = cat(0:(2/N_data):(1-(1/N_data)), 1:-(2/N_data):(1/N_data), dims=1) |> g
 control2 = cos.(2*pi*13*t) |> g
 
 # y = control1 .* tanh.(x .* 5.0f0 .* control2)
@@ -65,7 +66,7 @@ num_basis_functions = 80
 
 
 num_latent_variables = 2
-basis = [cos(2*pi*f*t) + im*sin(2*pi*f*t) for f in 0:29, t in t] |> g
+basis = [cos(2*pi*f*t/2) + im*sin(2*pi*f*t/2) for f in 0:29, t in t] |> g
 latent_params = 0.00001f0 * (randn(Float32, num_latent_variables, size(basis, 1)) + im*randn(Float32, num_latent_variables, size(basis, 1))) |> g
 
 # basis = basis./sum(basis, dims=2)
@@ -85,7 +86,7 @@ width = 16
 
 model = Flux.Chain(
     Flux.Conv((1,), (1+num_latent_variables)=>width), 
-    [Flux.Conv((1,), width=>width, Flux.rrelu) for n in 1:4]...,
+    [Flux.Conv((1,), width=>width, Flux.rrelu) for n in 1:8]...,
     Flux.Conv((1,), width=>1)
 ) |> g
 
