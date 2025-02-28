@@ -101,18 +101,20 @@ y_blocks = reshape(y, blocksize, 1, :)
 
 println("Setting up model...")
 
-width = [8, 16]
+width = [16, 32]
 
 # model = Flux.Chain(
 #     Flux.Conv((100,), (1+num_latent)=>width, Flux.celu), 
 #     [Flux.Conv((100,), width=>width, Flux.celu) for n in 1:4]...,
 #     Flux.Conv((100,), width=>1)
 # ) |> g
+
+activation = Flux.celu
 model = Flux.Chain(
   Flux.Conv((3,), (1+num_latent)=>width[1]),
-  [Flux.Conv((3,), width[1]=>width[1], Flux.celu, dilation=d) for d in [2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
-  Flux.Conv((3,), width[1]=>width[2], Flux.celu),
-  [Flux.Conv((3,), width[2]=>width[2], Flux.celu, dilation=d) for d in [2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
+  [Flux.Conv((3,), width[1]=>width[1], activation, dilation=d) for d in [2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
+  Flux.Conv((3,), width[1]=>width[2], activation),
+  [Flux.Conv((3,), width[2]=>width[2], activation, dilation=d) for d in [2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
   Flux.Conv((3,), width[2]=>1)
 ) |> g
 
@@ -169,7 +171,7 @@ for m in 1:5000;
     end; 
     display((m, Statistics.mean(losses)))
     for k in 1:length(sigmas)
-      UnicodePlots.lineplot(latent(gaussian, centers, sigmas, t_blocks_reduced, latent_params)[1,k,:]|>c, width=100) |> display
+      UnicodePlots.lineplot(latent(gaussian, centers, sigmas, t_blocks_reduced, latent_params)[1,k,:]|>c, width=displaysize(stdout)[2]-20) |> display
       # UnicodePlots.lineplot(latent(gaussian, centers, sigmas, t_blocks_reduced, latent_params)[1,2,:]|>c, width=100) |> display
       # Plots.plot(latent_params[1, :, k, 1] |> c)|> display
       # Plots.plot(reshape(latent(gaussian, centers, sigmas[:,:,k:k,:], t_blocks[:,:,:,1:160], latent_params[:,:,k:k,:]), blocksize*160, 1, 1)[:,1,1]|>c) |> display
