@@ -66,7 +66,7 @@ println("Creating basis functions...")
 basis_functions_per_second = 2
 num_basis_functions = Int(floor(basis_functions_per_second * T))
 
-sigmas = Float32.([9, 3]) |> g
+sigmas = Float32.([10, 2]) |> g
 
 basis_functions = [mexican_hat, mexican_hat]
 
@@ -187,7 +187,7 @@ for m in 1:5000;
     end
 
     if Statistics.mean(losses) < 0.2f-5 && adjusted == 1
-      Flux.adjust!(opt, 0.0001)
+      Flux.adjust!(opt, 0.0002)
       global adjusted = 2
     end
 
