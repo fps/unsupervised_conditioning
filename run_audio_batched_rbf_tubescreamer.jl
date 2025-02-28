@@ -77,7 +77,9 @@ sigmas = reshape(sigmas, 1, 1, num_latent, 1)
 centers = Float32.(collect(T .* (0:(1/(num_basis_functions-1)):1))) |> g
 centers = reshape(centers, 1, length(centers), 1, 1)
 
-latent_params = Float32.(0.00000001f0 * randn(1, num_basis_functions, num_latent, 1)) |> g
+if @isdefined(init_latent_params) !! @isdefined(init_all)
+  latent_params = Float32.(0.00000001f0 * randn(1, num_basis_functions, num_latent, 1)) |> g
+end
 
 function basis(f, centers, sigmas, t_blocks)
     b = f(centers, sigmas, t_blocks)
@@ -86,7 +88,7 @@ end
 
 
 function latent(f, centers, sigmas, t_blocks, latent_params)
-    reshape(sum(latent_params .* basis(f, centers, sigmas, t_blocks), dims=2), size(t_blocks,1), size(sigmas, 3), size(t_blocks, 4))    
+    reshape(sum(latent_params .* basis(f, centers, sigmas, t_blocks), dims=2), size(t_blocks,1), size(sigmas, 3), size(t_blocks, 4)) 
 end
 
 
@@ -99,30 +101,35 @@ y_blocks = reshape(y, blocksize, 1, :)
 # basis_blocks = Float32.(
 
 
-println("Setting up model...")
-
-width = [16, 32]
-
-# model = Flux.Chain(
-#     Flux.Conv((100,), (1+num_latent)=>width, Flux.celu), 
-#     [Flux.Conv((100,), width=>width, Flux.celu) for n in 1:4]...,
-#     Flux.Conv((100,), width=>1)
-# ) |> g
-
-activation = Flux.celu
-model = Flux.Chain(
-  Flux.Conv((3,), (1+num_latent)=>width[1]),
-  [Flux.Conv((3,), width[1]=>width[1], activation, dilation=d) for d in [2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
-  Flux.Conv((3,), width[1]=>width[2], activation),
-  [Flux.Conv((3,), width[2]=>width[2], activation, dilation=d) for d in [2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
-  Flux.Conv((3,), width[2]=>1)
-) |> g
-
-test_out = model(randn(Float32, blocksize, (1+num_latent), 1) |> g)
-offset = blocksize - size(test_out, 1)
-println("Offset: $(offset)")
-
-opt = Flux.setup(Flux.AdamW(0.001), [model, latent_params])
+if @isdefined(init_model) !! @isdefined(init_all)
+  println("Setting up model...")
+  
+  width = [8, 8]
+  
+  # model = Flux.Chain(
+  #     Flux.Conv((100,), (1+num_latent)=>width, Flux.celu), 
+  #     [Flux.Conv((100,), width=>width, Flux.celu) for n in 1:4]...,
+  #     Flux.Conv((100,), width=>1)
+  # ) |> g
+  
+  activation = Flux.celu
+  model = Flux.Chain(
+    Flux.Conv((3,), (1+num_latent)=>width[1]),
+    [Flux.Conv((3,), width[1]=>width[1], activation, dilation=d) for d in [2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
+    Flux.Conv((3,), width[1]=>width[2], activation),
+    [Flux.Conv((3,), width[2]=>width[2], activation, dilation=d) for d in [2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
+    Flux.Conv((3,), width[2]=>1)
+  ) |> g
+  
+  test_out = model(randn(Float32, blocksize, (1+num_latent), 1) |> g)
+  offset = blocksize - size(test_out, 1)
+  println("Offset: $(offset)")
+end
+  
+if @isdefined(init_optimizer) || @isdefined(init_all)
+  println("Setting up optimizer...")
+  opt = Flux.setup(Flux.AdamW(0.001), [model, latent_params])
+end
 
 loss(m, x, y) = Flux.Losses.mse(m(x), y)
 
@@ -131,6 +138,7 @@ println("Entering training loop...")
 
 I = eye(num_latent)
 
+println("Setting up resample model...")
 w_resample = zeros(Float32, t_reduce, num_latent, num_latent)
 w_resample[:,1,1] .= 1
 w_resample[:,2,2] .= 1
