@@ -133,18 +133,20 @@ end
 
 loss(m, x, y) = Flux.Losses.mse(m(x), y)
 
-
-println("Entering training loop...")
-
-I = eye(num_latent)
-
 println("Setting up resample model...")
 w_resample = zeros(Float32, t_reduce, num_latent, num_latent)
 w_resample[:,1,1] .= 1
 w_resample[:,2,2] .= 1
 resample_model = Flux.ConvTranspose(w_resample, stride=t_reduce) |> g
 
+
+println("Entering training loop...")
+
 # Profile.@profile 
+if init_schedule || init_all
+  adjusted = 0
+end
+
 for m in 1:5000;
     losses = []
     for n in 1:1; 
@@ -178,6 +180,17 @@ for m in 1:5000;
         print(">")
     end; 
     display((m, Statistics.mean(losses)))
+
+    if Statistics.mean(losses) < 1f-4 && adjusted == 0
+      Flux.adjust!(opt, 0.0005)
+      global adjusted = 1
+    end
+
+    if Statistics.mean(losses) < 0.2f-5 && adjusted == 1
+      Flux.adjust!(opt, 0.0001)
+      global adjusted = 2
+    end
+
     for k in 1:length(sigmas)
       UnicodePlots.lineplot(latent(gaussian, centers, sigmas, t_blocks_reduced, latent_params)[1,k,:]|>c, width=displaysize(stdout)[2]-20) |> display
       # UnicodePlots.lineplot(latent(gaussian, centers, sigmas, t_blocks_reduced, latent_params)[1,2,:]|>c, width=100) |> display
