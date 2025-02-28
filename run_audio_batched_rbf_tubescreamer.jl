@@ -66,7 +66,7 @@ println("Creating basis functions...")
 basis_functions_per_second = 2
 num_basis_functions = Int(floor(basis_functions_per_second * T))
 
-sigmas = Float32.([60, 3]) |> g
+sigmas = Float32.([9, 3]) |> g
 
 basis_functions = [mexican_hat, mexican_hat]
 
@@ -77,7 +77,7 @@ sigmas = reshape(sigmas, 1, 1, num_latent, 1)
 centers = Float32.(collect(T .* (0:(1/(num_basis_functions-1)):1))) |> g
 centers = reshape(centers, 1, length(centers), 1, 1)
 
-if @isdefined(init_latent_params) !! @isdefined(init_all)
+if init_latent_params || init_all
   latent_params = Float32.(0.00000001f0 * randn(1, num_basis_functions, num_latent, 1)) |> g
 end
 
@@ -101,7 +101,7 @@ y_blocks = reshape(y, blocksize, 1, :)
 # basis_blocks = Float32.(
 
 
-if @isdefined(init_model) !! @isdefined(init_all)
+if init_model !! init_all
   println("Setting up model...")
   
   width = [8, 8]
@@ -126,7 +126,7 @@ if @isdefined(init_model) !! @isdefined(init_all)
   println("Offset: $(offset)")
 end
   
-if @isdefined(init_optimizer) || @isdefined(init_all)
+if init_optimizer || init_all
   println("Setting up optimizer...")
   opt = Flux.setup(Flux.AdamW(0.001), [model, latent_params])
 end
