@@ -1,3 +1,5 @@
+x_test, fs_x_test = WAV.wavread("clean_marshall_riff.wav")
+
 l = latent(gaussian, centers, sigmas, t_blocks_reduced, latent_params);
 
 l_limits = [(minimum(l[:,k,:]), maximum(l[:,k,:])) for k in 1:num_latent]
