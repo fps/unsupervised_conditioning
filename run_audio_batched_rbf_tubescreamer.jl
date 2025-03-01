@@ -104,7 +104,7 @@ y_blocks = reshape(y, blocksize, 1, :)
 if init_model !! init_all
   println("Setting up model...")
   
-  width = [8, 8]
+  width = [16, 16]
   
   # model = Flux.Chain(
   #     Flux.Conv((100,), (1+num_latent)=>width, Flux.celu), 
