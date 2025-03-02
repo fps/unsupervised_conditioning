@@ -112,12 +112,13 @@ if init_model !! init_all
   #     Flux.Conv((100,), width=>1)
   # ) |> g
   
-  activation = Flux.celu
+  # activation = Flux.celu
+  activation = Flux.tanh
   model = Flux.Chain(
     Flux.Conv((3,), (1+num_latent)=>width[1]),
-    [Flux.Conv((3,), width[1]=>width[1], activation, dilation=d) for d in [2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
+    [Flux.Conv((3,), width[1]=>width[1], activation, dilation=d) for d in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
     Flux.Conv((3,), width[1]=>width[2], activation),
-    [Flux.Conv((3,), width[2]=>width[2], activation, dilation=d) for d in [2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
+    [Flux.Conv((3,), width[2]=>width[2], activation, dilation=d) for d in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
     Flux.Conv((3,), width[2]=>1)
   ) |> g
   
@@ -193,9 +194,5 @@ for m in 1:5000;
 
     for k in 1:length(sigmas)
       UnicodePlots.lineplot(latent(gaussian, centers, sigmas, t_blocks_reduced, latent_params)[1,k,:]|>c, width=displaysize(stdout)[2]-20) |> display
-      # UnicodePlots.lineplot(latent(gaussian, centers, sigmas, t_blocks_reduced, latent_params)[1,2,:]|>c, width=100) |> display
-      # Plots.plot(latent_params[1, :, k, 1] |> c)|> display
-      # Plots.plot(reshape(latent(gaussian, centers, sigmas[:,:,k:k,:], t_blocks[:,:,:,1:160], latent_params[:,:,k:k,:]), blocksize*160, 1, 1)[:,1,1]|>c) |> display
     end
-    # Plots.plot(latent(gaussian, centers, sigmas, t_blocks[:,:,:,1:10])[:,:,1]|>c) |> display
 end
