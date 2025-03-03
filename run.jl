@@ -23,6 +23,7 @@ println("Initial setup...")
 
 include("basis.jl")
 include("util.jl")
+include("synthetic_data.jl")
 
 g = Flux.gpu
 c = Flux.cpu
@@ -31,17 +32,21 @@ g = g
 
 println("Loading training data...")
 
-# xx, fs_x = WAV.wavread("noise-3.wav")
-# x, fs_x = WAV.wavread("Take5_Audio 2-1.wav")
-x, fs_x = WAV.wavread("varying_noise.wav")
+if false
+    # xx, fs_x = WAV.wavread("noise-3.wav")
+    # x, fs_x = WAV.wavread("Take5_Audio 2-1.wav")
+    x, fs_x = WAV.wavread("varying_noise.wav")
+    
+    x = Float32.(x)
+    
+    y, fs_y = WAV.wavread("Take15_screamer-1.wav")
+    y = Float32.(y)
+    
+    FS = fs_x
+end
 
-x = Float32.(x)
-
-y, fs_y = WAV.wavread("Take15_screamer-1.wav")
-y = Float32.(y)
-
-FS = fs_x
-
+x, y, FS = synthetic_data_3controls()
+    
 blocksize = Int(FS/2)
 
 # We throw away between 1 and (blocksize-1) data away here.
@@ -63,17 +68,16 @@ t_blocks_reduced = t_blocks[1:t_reduce:end, :, :, :]
 
 println("Creating basis functions...")
 
-basis_functions_per_second = 2
+basis_functions_per_second = 10 
 num_basis_functions = Int(floor(basis_functions_per_second * T))
 
-sigmas = Float32.([10, 2]) |> g
+sigmas = Float32.([10, 1, 0.3]) |> g
 
 basis_functions = [mexican_hat, mexican_hat]
 
 num_latent = length(sigmas)
 sigmas = reshape(sigmas, 1, 1, num_latent, 1)
 
-# basis = Float32.([f(center, sigma, t) for (sigma, f) in zip(sigmas, basis_functions), t in t, center in T .* (0:(1/(num_basis_functions-1)):1)])
 centers = Float32.(collect(T .* (0:(1/(num_basis_functions-1)):1))) |> g
 centers = reshape(centers, 1, length(centers), 1, 1)
 
@@ -84,6 +88,7 @@ end
 function basis(f, centers, sigmas, t_blocks)
     b = f(centers, sigmas, t_blocks)
     b ./ (sum(b, dims=2) .+ 0.00000001f0)
+    # b
 end
 
 
@@ -96,21 +101,12 @@ println("Dividing data into blocks...")
 
 x_blocks = reshape(x, blocksize, 1, :)
 y_blocks = reshape(y, blocksize, 1, :)
-# basis_blocks = reshape(permutedims(basis,(1, 3, 2)), length(sigmas), blocksize, num_basis_functions, :)
-# basis_blocks = cat([basis[:,start:(start+blocksize-1),:] for start in 1:blocksize:N_data]..., dims=4)
-# basis_blocks = Float32.(
 
-
+  
 if init_model !! init_all
   println("Setting up model...")
   
-  width = [16, 16]
-  
-  # model = Flux.Chain(
-  #     Flux.Conv((100,), (1+num_latent)=>width, Flux.celu), 
-  #     [Flux.Conv((100,), width=>width, Flux.celu) for n in 1:4]...,
-  #     Flux.Conv((100,), width=>1)
-  # ) |> g
+  width = [32, 16]
   
   # activation = Flux.celu
   activation = Flux.tanh
@@ -136,8 +132,9 @@ loss(m, x, y) = Flux.Losses.mse(m(x), y)
 
 println("Setting up resample model...")
 w_resample = zeros(Float32, t_reduce, num_latent, num_latent)
-w_resample[:,1,1] .= 1
-w_resample[:,2,2] .= 1
+for n in 1:num_latent
+    w_resample[:,n,n] .= 1
+end
 resample_model = Flux.ConvTranspose(w_resample, stride=t_reduce) |> g
 
 
@@ -151,7 +148,7 @@ end
 for m in 1:5000;
     losses = []
     for n in 1:1; 
-        batchsize = 16
+        batchsize = 32
         data_loader = Flux.MLUtils.DataLoader((x_blocks, y_blocks, t_blocks_reduced), batchsize=batchsize, shuffle=true)
         print("<")
         
@@ -183,16 +180,16 @@ for m in 1:5000;
     display((m, Statistics.mean(losses)))
 
     if Statistics.mean(losses) < 1f-4 && adjusted == 0
-      Flux.adjust!(opt, 0.0005)
+      Flux.adjust!(opt, 0.00005)
       global adjusted = 1
     end
 
     if Statistics.mean(losses) < 0.2f-5 && adjusted == 1
-      Flux.adjust!(opt, 0.0002)
+      Flux.adjust!(opt, 0.00002)
       global adjusted = 2
     end
 
     for k in 1:length(sigmas)
-      UnicodePlots.lineplot(latent(gaussian, centers, sigmas, t_blocks_reduced, latent_params)[1,k,:]|>c, width=displaysize(stdout)[2]-20) |> display
+      UnicodePlots.lineplot(latent(gaussian, centers, sigmas, t_blocks_reduced[1:1, :, :, :], latent_params)[1,k,:]|>c, width=displaysize(stdout)[2]-20) |> display
     end
 end
