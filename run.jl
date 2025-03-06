@@ -47,7 +47,7 @@ end
 
 x, y, FS, controls = synthetic_data_3controls()
     
-blocksize = Int(FS)
+blocksize = Int(FS/8)
 
 # We throw away between 1 and (blocksize-1) data away here.
 
@@ -106,7 +106,7 @@ y_blocks = reshape(y, blocksize, 1, :)
 if init_model || init_all
   println("Setting up model...")
   
-  width = [32, 32]
+  width = [8, 8]
   
   activation = Flux.celu
   # activation = Flux.tanh
@@ -150,7 +150,7 @@ I = eye(num_latent)
 for m in 1:5000;
     losses = []
     for n in 1:1; 
-        batchsize = 2
+        batchsize = 32
         data_loader = Flux.MLUtils.DataLoader((x_blocks, y_blocks, t_blocks_reduced), batchsize=batchsize, shuffle=true)
         print("<")
         
@@ -166,7 +166,7 @@ for m in 1:5000;
                 the_latents = resample_model(the_latents)
                 # the_latents = the_latents .+ g(0.01f0 .* randn(Float32, size(the_latents)))
                 
-               loss(m, cat(x_block, the_latents, dims=2), y_block[(1+offset):end, :, :] |> g) # + 0.01f0 * sum((I .- cov(latent_params[1,:,:,1])).^2) + 0.0001f0 * sum(Statistics.mean(latent_params, dims=1).^2)
+               loss(m, cat(x_block, the_latents, dims=2), y_block[(1+offset):end, :, :] |> g) + sum(latent(gaussian, centers, sigmas .* 50, reshape(centers, :, 1, 1, 1), latent_params).^2) # + 0.01f0 * sum((I .- cov(latent_params[1,:,:,1])).^2) + 0.0001f0 * sum(Statistics.mean(latent_params, dims=1).^2)
             end
             push!(losses, the_loss)
             
