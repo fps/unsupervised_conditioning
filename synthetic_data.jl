@@ -18,7 +18,7 @@ function synthetic_data_3controls()
 
     states = [SVF.State(), SVF.State()]
 
-    distorted = tanh.(10 .* controls[1] .* x)
+    distorted = tanh.(100 .* controls[1] .* x)
 
     filtered1 = zeros(size(x))
 

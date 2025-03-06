@@ -61,7 +61,7 @@ y = y[1:N_data] |> g
 
 t = Float32.(0:(1/FS):(T-(1/FS)))
 
-t_reduce = 10
+t_reduce = 100
 
 t_blocks = reshape(t, blocksize, 1, 1, :) |> g
 t_blocks_reduced = t_blocks[1:t_reduce:end, :, :, :]
@@ -125,7 +125,7 @@ end
   
 if init_optimizer || init_all
   println("Setting up optimizer...")
-  opt = Flux.setup(Flux.AdamW(0.001), [model, latent_params])
+  opt = Flux.setup(Flux.AdamW(0.0005), [model, latent_params])
 end
 
 loss(m, x, y) = Flux.Losses.mse(m(x), y)
@@ -177,12 +177,12 @@ for m in 1:5000;
     display((m, Statistics.mean(losses)))
 
     if Statistics.mean(losses) < 1f-4 && adjusted == 0
-      Flux.adjust!(opt, 0.00005)
+      Flux.adjust!(opt, 0.0001)
       global adjusted = 1
     end
 
     if Statistics.mean(losses) < 0.2f-5 && adjusted == 1
-      Flux.adjust!(opt, 0.00002)
+      Flux.adjust!(opt, 0.0005)
       global adjusted = 2
     end
 
