@@ -11,7 +11,8 @@ function synthetic_data_3controls()
     f = [1/(110.7), 1/9.3, 1/1.5]
 
     controls = 0.3 .* [
-        2 .+ sin.(2 * pi * f[1] .* t .+ 7.33), 
+        # 2 .+ sin.(2 * pi * f[1] .* t .+ 7.33), 
+        0.1 .+ (0:(1/N_data):(1-(1/N_data))),
         2 .+ sin.(2 * pi * f[2] .* t .+ 0.12), 
         2 .+ cos.(2 * pi * f[3] .* t .+ 11.212)
     ]
@@ -33,5 +34,9 @@ function synthetic_data_3controls()
     end
 
     y = controls[3] .* filtered1 .+ controls[2] .* filtered2
-    x, y, 48000.0, controls
+
+    # sigmas = [ 20, 1, 0.1 ]
+    sigmas = (1 ./ f) ./ 5
+
+    x, y, 48000.0, sigmas, controls
 end

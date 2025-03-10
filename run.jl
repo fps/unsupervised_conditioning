@@ -24,6 +24,7 @@ println("Initial setup...")
 include("basis.jl")
 include("util.jl")
 include("synthetic_data.jl")
+include("data/fender_blues_junior/data.jl")
 
 g = Flux.gpu
 c = Flux.cpu
@@ -45,9 +46,11 @@ if false
     FS = fs_x
 end
 
-x, y, FS, controls = synthetic_data_3controls()
+# x, y, FS, sigmas, controls = synthetic_data_3controls()
+x, y, FS, sigmas, controls = data()
     
-blocksize = Int(FS/8)
+
+blocksize = Int(FS/2)
 
 # We throw away between 1 and (blocksize-1) data away here.
 
@@ -59,19 +62,22 @@ T = N_data / FS
 x = x[1:N_data] |> g
 y = y[1:N_data] |> g
 
-t = Float32.(0:(1/FS):(T-(1/FS)))
+# t = Float32.(0:(1/FS):(T-(1/FS))
+t = collect((0:(N_data - 1)) ./ FS)
 
-t_reduce = 100
+t_reduce = 600
 
 t_blocks = reshape(t, blocksize, 1, 1, :) |> g
 t_blocks_reduced = t_blocks[1:t_reduce:end, :, :, :]
 
 println("Creating basis functions...")
 
-basis_functions_per_second = 10 
+basis_functions_per_second = 2/minimum(sigmas)
 num_basis_functions = Int(floor(basis_functions_per_second * T))
 
-sigmas = Float32.([20, 1, 0.1]) |> g
+# sigmas = Float32.([20, 1, 0.1]) |> g
+# sigmas = 0.01 .* sigmas
+sigmas = sigmas |> g
 
 basis_functions = [gaussian, mexican_hat, mexican_hat]
 
@@ -106,7 +112,7 @@ y_blocks = reshape(y, blocksize, 1, :)
 if init_model || init_all
   println("Setting up model...")
   
-  width = [8, 8]
+  width = [32, 16]
   
   activation = Flux.celu
   # activation = Flux.tanh
@@ -123,9 +129,11 @@ if init_model || init_all
   println("Offset: $(offset)")
 end
   
+
 if init_optimizer || init_all
   println("Setting up optimizer...")
-  opt = Flux.setup(Flux.AdamW(0.0005), [model, latent_params])
+  global lr = 0.001
+  opt = Flux.setup(Flux.AdamW(lr), [model, latent_params])
 end
 
 loss(m, x, y) = Flux.Losses.mse(m(x), y)
@@ -150,7 +158,7 @@ I = eye(num_latent)
 for m in 1:5000;
     losses = []
     for n in 1:1; 
-        batchsize = 32
+        batchsize = 8
         data_loader = Flux.MLUtils.DataLoader((x_blocks, y_blocks, t_blocks_reduced), batchsize=batchsize, shuffle=true)
         print("<")
         
@@ -166,7 +174,8 @@ for m in 1:5000;
                 the_latents = resample_model(the_latents)
                 # the_latents = the_latents .+ g(0.01f0 .* randn(Float32, size(the_latents)))
                 
-               loss(m, cat(x_block, the_latents, dims=2), y_block[(1+offset):end, :, :] |> g) + sum(latent(gaussian, centers, sigmas .* 50, reshape(centers, :, 1, 1, 1), latent_params).^2) # + 0.01f0 * sum((I .- cov(latent_params[1,:,:,1])).^2) + 0.0001f0 * sum(Statistics.mean(latent_params, dims=1).^2)
+               loss(m, cat(x_block, the_latents, dims=2), y_block[(1+offset):end, :, :] |> g) + sum(latent(gaussian, centers, sigmas .* 80, reshape(centers, :, 1, 1, 1), latent_params).^2) # +  sum(latent_params.^2) # sum((g(0.001 .* ones(1, 3, 1)) .- sum((latent(gaussian, centers, sigmas, reshape(centers, :, 1, 1, 1), latent_params) .- latent(gaussian, centers, sigmas .* 80, reshape(centers, :, 1, 1, 1), latent_params)).^2 ./ length(centers), dims=1)).^2)
+                # + 0.01f0 * sum((I .- cov(latent_params[1,:,:,1])).^2) + 0.0001f0 * sum(Statistics.mean(latent_params, dims=1).^2)
             end
             push!(losses, the_loss)
             
@@ -174,15 +183,17 @@ for m in 1:5000;
         end
         print(">")
     end; 
-    display((m, Statistics.mean(losses)))
+    display((lr, m, Statistics.mean(losses)))
 
-    if Statistics.mean(losses) < 1f-4 && adjusted == 0
-      Flux.adjust!(opt, 0.0001)
+    if Statistics.mean(losses) < 1f-3 && adjusted == 0
+      global lr *= 0.5
+      Flux.adjust!(opt, lr)
       global adjusted = 1
     end
 
-    if Statistics.mean(losses) < 0.2f-5 && adjusted == 1
-      Flux.adjust!(opt, 0.0005)
+    if Statistics.mean(losses) < 5f-4 && adjusted == 1
+      global lr *= 0.5
+      Flux.adjust!(opt, lr)
       global adjusted = 2
     end
 
