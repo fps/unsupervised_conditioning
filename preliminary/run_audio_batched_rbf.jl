@@ -33,53 +33,51 @@ T = 1
 
 blocksize = 2000
 
-t = 0:(1/FS):(T-(1/FS))
-
-t_blocks = reshape(t, blocksize, :) |> g
+t = Float32.(0:(1/FS):(T-(1/FS)))
 
 N_data = length(t)
 
 # x = sin.(40.0f0*2.0f0*pi.*t) .* randn(N_data) |> g
-x = randn(N_data, 1)|> g
+x = randn(Float32, N_data, 1, 1) |> g
 
 f1 = 0.2653
 f2 = 56.3421
+p2 = 1/f2
 
 # control1 = 1.0f0 .* (sin.(2*pi*f1*t.+0.1) .+ 1.2f0) 
 f1 = 2
-control1 = collect(0:(1/N_data):(1-(1/N_data)))
+control1 = collect(0:(1/N_data):(1-(1/N_data))) |> g
 
-
-control2 = 1.0f0 .* (cos.(2*pi*f2*t) .+ 1.1f0) 
+control2 = 1.0f0 .* cos.(2*pi*f2*t) |> g
 
 # control1 = control1 + 0.5f0 .* randn(Float32, size(control1)...) |> g
 # control2 = control2 + 0.5f0 .* randn(Float32, size(control1)...) |> g
 
-control1 = control1 |> g
-control2 = control2 |> g
+control1 = control1
+control2 = control2
 
-y = tanh.(control1 .+ control2 .* x) |> g
+y = tanh.(control1 .+ control2 .* x)
 
-num_basis_functions = Int(ceil(4 * maximum([f1, f2]) * T))
+num_basis_functions = Int(ceil(5 * maximum([f1, f2]) * T))
+centers = T .* (0:(1/(num_basis_functions-1)):1)
+centers = Float32.(reshape(centers, 1, :, 1, 1)) |> g
 
-sigmas = [1/(6*f1), 1/(4*f2)]
-basis_functions = [gaussian, gaussian]
+sigmas = Float32.([1/(6*f1), 1/(4*f2)])
+sigmas = reshape(sigmas, 1, 1, :, 1) |> g
 
 num_latent_variables = length(sigmas)
 
-basis = Float32.([f(center, sigma, t) for (sigma, f) in zip(sigmas, basis_functions), t in t, center in T .* (0:(1/(num_basis_functions-1)):1)]) |> g
-    
-basis = basis ./ sum(basis, dims=3)
-    
-latent_params = 0.00000001f0 * randn(Float32, num_latent_variables, num_basis_functions) |> g
+latent_params = 0.00000001f0 * randn(Float32, 1, num_basis_functions, num_latent_variables, 1) |> g
 
 
 println("Dividing data into blocks...")
 
-x_blocks = reshape(x, blocksize, :)
-y_blocks = reshape(y, blocksize, :)
+x_blocks = reshape(x, blocksize, 1, :) |> g
+y_blocks = reshape(y, blocksize, 1, :) |> g
+t_blocks = reshape(t, blocksize, 1, 1, :) |> g
+
 # basis_blocks = reshape(permutedims(basis,(1, 3, 2)), length(sigmas), blocksize, num_basis_functions, :)
-basis_blocks = cat([basis[:,start:(start+blocksize-1),:] for start in 1:blocksize:N_data]..., dims=4)
+# basis_blocks = cat([basis[:,start:(start+blocksize-1),:] for start in 1:blocksize:N_data]..., dims=4)
 # basis_blocks = Float32.(
 
 
@@ -103,13 +101,13 @@ println("Entering training loop...")
 
 # Profile.@profile 
 for m in 1:200;
-    latent = hcat([(latent_params[n:n,:] * basis[n,:,:]')' for n in 1:size(latent_params, 1)]...)
+    the_latent = latent(gaussian, centers, sigmas, reshape(t, :, 1, 1, 1)|>g, latent_params)
     
     Plots.plot(
         Plots.plot(x[:,1,1] |> c, title="Training input", legend=:none), 
         Plots.plot(y[:,1,1] |> c, title="Training output", legend=:none),
-        Plots.plot(model(repeat(cat(x, latent, dims=2), 1, 1, 1))[:,1,1] |> c, title="Model output", legend=:none),
-        [ Plots.plot((latent)[:,n,1] |> c, title="Inferred control input $(n)", legend=:none) for n in 1:num_latent_variables]...,
+        Plots.plot(model(repeat(cat(x, the_latent, dims=2), 1, 1, 1))[:,1,1] |> c, title="Model output", legend=:none),
+        [ Plots.plot((the_latent)[:,n,1] |> c, title="Inferred control input $(n)", legend=:none) for n in 1:num_latent_variables]...,
         layout=(3+num_latent_variables,1),
         ytickfontsize=4,
         xtickfontsize=4,
@@ -122,20 +120,28 @@ for m in 1:200;
     losses = []
     for n in 1:10; 
         batchsize = 1
-        data_loader = Flux.MLUtils.DataLoader((x_blocks, y_blocks, basis_blocks), batchsize=batchsize, shuffle=true)
+        data_loader = Flux.MLUtils.DataLoader((x_blocks, y_blocks, t_blocks), batchsize=batchsize, shuffle=true)
         print("<")
         
-        for (x_block, y_block, basis_block) in data_loader
+        for (x_block, y_block, t_block) in data_loader
             # print((size(x_block), size(y_block), size(basis_block)))
             batchsize = size(x_block, 2)
             print(".")
             the_loss, the_grads = Flux.withgradient([model, latent_params]) do params
-                local m = params[1]
-                local latent_params = params[2]
+                # local m = params[1]
+                # local latent_params = params[2]
                 # latent = hcat([(latent_params[n:n,:] * basis[n,:,:]')' for n in 1:size(latent_params, 1)]...)
-                local latent = cat([cat([basis_block[sigma,:,:,batch] * latent_params[sigma,:] for sigma in 1:length(sigmas)]..., dims=2) for batch in 1:batchsize]..., dims=3)
+                # local latent = cat([cat([basis_block[sigma,:,:,batch] * latent_params[sigma,:] for sigma in 1:length(sigmas)]..., dims=2) for batch in 1:batchsize]..., dims=3)
                 # print((size(latent), size(x_block), size(y_block)))
-                loss(m, cat(reshape(x_block, blocksize, 1, batchsize), latent, dims=2), reshape(y_block, blocksize, 1, batchsize)) # + (1 - Statistics.var(latent_params[2,:])).^2 # + sum(latent_params.^2)/(num_latent_variables*num_basis_functions)
+                (
+                    loss(params[1], cat(x_block, latent(gaussian, centers, sigmas, t_block, params[2]), dims=2), y_block) 
+                    + sum((-1.0f0 .- latent(gaussian, centers, sigmas, zeros(Float32, 1, 1, 1, 1) |> g, params[2])[:,1:1,:]).^2)  
+                    + sum((1.0f0 .- latent(gaussian, centers, sigmas, T .* ones(Float32, 1, 1, 1, 1) |> g, params[2])[:,1:1,:]).^2)
+                    + sum((1.0f0 .- latent(gaussian, centers, sigmas, Float32.(reshape(collect(0:p2:T), :, 1, 1, 1)) |> g, params[2])[:,2:2,:]).^2)
+                    + sum((-1.0f0 .- latent(gaussian, centers, sigmas, Float32.(reshape(collect((p2/2):p2:T), :, 1, 1, 1)) |> g, params[2])[:,2:2,:]).^2)
+                    + (max(1, maximum(latent(gaussian, centers, sigmas, Float32.(reshape(collect(0:0.01:T), :, 1, 1, 1)) |> g, params[2])[:,2:2,:])) - 1).^2
+                    + (min(-1, minimum(latent(gaussian, centers, sigmas, Float32.(reshape(collect(0:0.01:T), :, 1, 1, 1)) |> g, params[2])[:,2:2,:])) + 1).^2
+                )
             end
             push!(losses, the_loss)
             

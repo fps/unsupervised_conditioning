@@ -9,12 +9,23 @@ end
 function basis(f, centers, sigmas, t_blocks)
     b = f(centers, sigmas, t_blocks)
     # b ./ (sum(b, dims=2) .+ 0.00000001f0)
-    # b
-    b ./ sum(b, dims=1)
+    b ./ sum(b, dims=2)
+    # b ./ sum(b, dims=1)
 end
 
 
+# function latent(f, centers, sigmas, t_blocks, latent_params)
+#     selectdim(sum(latent_params .* basis(f, centers, sigmas, t_blocks), dims=2), 2, 1)
+# end
+
+# function basis(f, centers, sigmas, t_blocks)
+#     b = f(centers, sigmas, t_blocks)
+#     b ./ (sum(b, dims=2) .+ 0.00000001f0)
+#     # b
+# end
+#
+#
 function latent(f, centers, sigmas, t_blocks, latent_params)
-    selectdim(sum(latent_params .* basis(f, centers, sigmas, t_blocks), dims=2), 2, 1)
+    reshape(sum(latent_params .* basis(f, centers, sigmas, t_blocks), dims=2), size(t_blocks,1), size(sigmas, 3), size(t_blocks, 4))
 end
 

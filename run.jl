@@ -65,7 +65,8 @@ y = y[1:N_data] |> g
 # t = Float32.(0:(1/FS):(T-(1/FS))
 t = collect((0:(N_data - 1)) ./ FS)
 
-t_reduce = 600
+t_reduce = Int(FS/2)
+# t_reduce = 600
 
 t_blocks = reshape(t, blocksize, 1, 1, :) |> g
 t_blocks_reduced = t_blocks[1:t_reduce:end, :, :, :]
@@ -87,20 +88,22 @@ sigmas = reshape(sigmas, 1, 1, num_latent, 1)
 centers = Float32.(collect(T .* (0:(1/(num_basis_functions-1)):1))) |> g
 centers = reshape(centers, 1, length(centers), 1, 1)
 
-if init_latent_params || init_all
-  latent_params = Float32.(0.00000000001f0 * randn(1, num_basis_functions, num_latent, 1)) |> g
+if init
+  # latent_params = Float32.(0.00000000001f0 * randn(1, num_basis_functions, num_latent, 1)) |> g
+  latent_params = Float32.(0.1f0 * randn(1, num_basis_functions, num_latent, 1)) |> g
+  # latent_params = latent_params ./ maximum(abs.(latent_params), dims=2)
 end
 
-function basis(f, centers, sigmas, t_blocks)
-    b = f(centers, sigmas, t_blocks)
-    b ./ (sum(b, dims=2) .+ 0.00000001f0)
-    # b
-end
-
-
-function latent(f, centers, sigmas, t_blocks, latent_params)
-    reshape(sum(latent_params .* basis(f, centers, sigmas, t_blocks), dims=2), size(t_blocks,1), size(sigmas, 3), size(t_blocks, 4)) 
-end
+# function basis(f, centers, sigmas, t_blocks)
+#     b = f(centers, sigmas, t_blocks)
+#     b ./ (sum(b, dims=2) .+ 0.00000001f0)
+#     # b
+# end
+# 
+# 
+# function latent(f, centers, sigmas, t_blocks, latent_params)
+#     reshape(sum(latent_params .* basis(f, centers, sigmas, t_blocks), dims=2), size(t_blocks,1), size(sigmas, 3), size(t_blocks, 4)) 
+# end
 
 
 println("Dividing data into blocks...")
@@ -109,7 +112,7 @@ x_blocks = reshape(x, blocksize, 1, :)
 y_blocks = reshape(y, blocksize, 1, :)
 
   
-if init_model || init_all
+if init
   println("Setting up model...")
   
   width = [32, 16]
@@ -117,11 +120,11 @@ if init_model || init_all
   activation = Flux.celu
   # activation = Flux.tanh
   model = Flux.Chain(
-    Flux.Conv((3,), (1+num_latent)=>width[1]),
+    Flux.Conv((1,), (1+num_latent)=>width[1]),
     [Flux.Conv((3,), width[1]=>width[1], activation, dilation=d) for d in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
     Flux.Conv((3,), width[1]=>width[2], activation),
     [Flux.Conv((3,), width[2]=>width[2], activation, dilation=d) for d in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
-    Flux.Conv((3,), width[2]=>1)
+    Flux.Conv((1,), width[2]=>1)
   ) |> g
   
   test_out = model(randn(Float32, blocksize, (1+num_latent), 1) |> g)
@@ -130,9 +133,10 @@ if init_model || init_all
 end
   
 
-if init_optimizer || init_all
+if init
   println("Setting up optimizer...")
   global lr = 0.001
+  # opt = Flux.setup(Flux.Adam(lr), [model, latent_params])
   opt = Flux.setup(Flux.AdamW(lr), [model, latent_params])
 end
 
@@ -149,7 +153,7 @@ resample_model = Flux.ConvTranspose(w_resample, stride=t_reduce) |> g
 println("Entering training loop...")
 
 # Profile.@profile 
-if init_schedule || init_all
+if init
   adjusted = 0
 end
 
@@ -173,13 +177,15 @@ for m in 1:5000;
                 local the_latents = latent(gaussian, centers, sigmas, t_block, latent_params)
                 the_latents = resample_model(the_latents)
                 # the_latents = the_latents .+ g(0.01f0 .* randn(Float32, size(the_latents)))
-                
-               loss(m, cat(x_block, the_latents, dims=2), y_block[(1+offset):end, :, :] |> g) + sum(latent(gaussian, centers, sigmas .* 80, reshape(centers, :, 1, 1, 1), latent_params).^2) # +  sum(latent_params.^2) # sum((g(0.001 .* ones(1, 3, 1)) .- sum((latent(gaussian, centers, sigmas, reshape(centers, :, 1, 1, 1), latent_params) .- latent(gaussian, centers, sigmas .* 80, reshape(centers, :, 1, 1, 1), latent_params)).^2 ./ length(centers), dims=1)).^2)
+                # local the_latents = zeros(Float32, size(x_block, 1), 3, size(x_block, 3)) |> g                
+
+               loss(m, cat(x_block, the_latents, dims=2), y_block[(1+offset):end, :, :] |> g) + 1.0f0 * sum(latent(gaussian, centers, sigmas .* 40, reshape(centers, :, 1, 1, 1), latent_params).^2) # + sum((0.001 .- Statistics.var(latent_params, dims=2)).^2) # +  sum(latent_params.^2) # sum((g(0.001 .* ones(1, 3, 1)) .- sum((latent(gaussian, centers, sigmas, reshape(centers, :, 1, 1, 1), latent_params) .- latent(gaussian, centers, sigmas .* 80, reshape(centers, :, 1, 1, 1), latent_params)).^2 ./ length(centers), dims=1)).^2)
                 # + 0.01f0 * sum((I .- cov(latent_params[1,:,:,1])).^2) + 0.0001f0 * sum(Statistics.mean(latent_params, dims=1).^2)
             end
             push!(losses, the_loss)
             
             Flux.update!(opt, [model, latent_params], the_grads[1])
+            # global latent_params = latent_params ./ maximum(abs.(latent_params), dims=2)
         end
         print(">")
     end; 
