@@ -86,10 +86,10 @@ for n in 1:num_latent_variables
     reconstruction_weights[:,n:n,n:n] = reconstruction_kernel
 end
 
-reconstruction_model = Flux.Conv(reconstruction_weights, pad=Flux.SamePad()) |> g
+reconstruction_model = Flux.Conv(reconstruction_weights) |> g
 
 if init
-    latent_params = 1.0f-5 * randn(Float32, Int(ceil((length(x)/downsampling)))+(2*smoothing_kernel_half_length), num_latent_variables) |> g
+    latent_params = 1.0f-5 * randn(Float32, Int(ceil((length(x)/downsampling)))+(4*smoothing_kernel_half_length), num_latent_variables) |> g
     # scales = 1.0f0 * randn(Float32, 1, 1, num_latent_variables, 1)  |> g
 end
 
@@ -135,8 +135,6 @@ finetuning = [
     ]
 ] |> g
 
-sample_loss = 0
-
 # Profile.@profile 
 for m in 1:20000;
     the_latent = reconstruction_model(upsampling_model(smoothing_model(reshape(latent_params, :, num_latent_variables, 1))))
@@ -164,7 +162,7 @@ for m in 1:20000;
         data_loader = Flux.MLUtils.DataLoader((x_blocks, y_blocks, index_blocks), batchsize=batchsize, shuffle=true)
         print("<")
         
-        sample_loss = 0
+        local sample_loss = 0
         for (x_block, y_block, index_block) in data_loader
             # print((size(x_block), size(y_block), size(index_block)))
             # display(upsampling_model(smoothing_model(cat([latent_params[index_block[1, b]:(2*smoothing_kernel_half_length + index_block[end, b]), :] for b in 1:size(x, 3)]..., dims=3))))
@@ -172,7 +170,7 @@ for m in 1:20000;
             the_loss, the_grads = Flux.withgradient([model, latent_params]) do params
                 # l = loss(params[1], cat(x_block, [params[2][index_block, d, :] for d in 1:num_latent_variables]..., dims=2), y_block)
                 
-                local smoothed_latent = smoothing_model(cat([params[2][index_block[1, b]:(2*smoothing_kernel_half_length + index_block[end, b]), :] for b in 1:size(x, 3)]..., dims=3))
+                local smoothed_latent = smoothing_model(cat([params[2][index_block[1, b]:(4*smoothing_kernel_half_length + index_block[end, b]), :] for b in 1:size(x, 3)]..., dims=3))
                 
                 local upsampled_latent = upsampling_model(smoothed_latent)
                 
