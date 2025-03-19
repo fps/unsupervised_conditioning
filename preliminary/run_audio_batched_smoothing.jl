@@ -14,6 +14,7 @@ import LinearAlgebra
 
 import Random
 import Profile
+import DSP
 
 
 println("Initial setup...")
@@ -39,8 +40,8 @@ N_data = length(t)
 
 x = randn(Float32, N_data, 1, 1) |> g
 
-f1 = 3.1653f0
-f2 = 6.3421f0
+f1 = 6.1653f0
+f2 = 36.3421f0
 p2 = 1/f2
 
 control1 = 1.0f0 .* (sin.(2*pi*f1*t.+0.1) .+ 1.2f0)  |> g
@@ -54,20 +55,35 @@ y = tanh.(control1 .+ control2 .* x)
 sigmas = Float32.([1/f1, 1/f2] ./ 8)
 num_latent_variables = length(sigmas)
 
-
+lower_bandwidth = 1.5
+upper_bandwidth = 1.1
+band1 = (f1 / lower_bandwidth, f1 * upper_bandwidth)
+band2 = (f2 / lower_bandwidth, f2 * upper_bandwidth)
 
 downsampling = 10
 upsampling_model = Flux.ConvTranspose([(i == j ? 1.0f0 : 0.0f0) for k = 1:downsampling, i = 1:num_latent_variables, j = 1:num_latent_variables], stride=downsampling) |> g
 
-smoothing_kernel_half_length = Int(ceil(5 * maximum(sigmas) * FS/(2*downsampling)))
-smoothing_kernels = gaussian(zeros(1,1,1), reshape(sigmas*(FS/downsampling), 1, 2,1), reshape(-smoothing_kernel_half_length:smoothing_kernel_half_length, :, 1, 1))
-smoothing_kernels = smoothing_kernels ./ sum(smoothing_kernels, dims=1) 
+smoothing_kernel_half_length = Int(ceil(8 * maximum(sigmas) * FS/(2*downsampling)))
+# smoothing_kernels = gaussian(zeros(1,1,1), reshape(sigmas*(FS/downsampling), 1, 2,1), reshape(-smoothing_kernel_half_length:smoothing_kernel_half_length, :, 1, 1))
+# smoothing_kernels = smoothing_kernels ./ sum(smoothing_kernels, dims=1) 
+# smoothing_weights = zeros(2*smoothing_kernel_half_length+1, 2, 2)
+# for n in 1:num_latent_variables
+#     smoothing_weights[:,n:n,n:n] = smoothing_kernels[:,n:n,:]
+# end
+# 
+# smoothing_weights[:,2,2] = smoothing_weights[:,2,2] .- smoothing_weights[:,1,1]
+
+smoothing_kernels = ones(2*smoothing_kernel_half_length+1, 2)
+
+smoothing_kernels[:,1] = DSP.Filters.digitalfilter(DSP.Filters.Bandpass((band1./(24000/downsampling))...), DSP.FIRWindow(smoothing_kernels[:,1]))
+
+smoothing_kernels[:,2] = DSP.Filters.digitalfilter(DSP.Filters.Bandpass((band2./(24000/downsampling))...), DSP.FIRWindow(smoothing_kernels[:,2]))
+
 smoothing_weights = zeros(2*smoothing_kernel_half_length+1, 2, 2)
 for n in 1:num_latent_variables
     smoothing_weights[:,n:n,n:n] = smoothing_kernels[:,n:n,:]
 end
 
-smoothing_weights[:,2,2] = smoothing_weights[:,2,2] .- smoothing_weights[:,1,1]
 
 smoothing_weights = smoothing_weights |> g
 smoothing_model = Flux.Conv(smoothing_weights) |> g
@@ -99,7 +115,7 @@ if init
         Flux.Conv((1,), width=>1)
     ) |> g
 
-    opt = Flux.setup(Flux.AdamW(0.001), [model, latent_params])
+    opt = Flux.setup(Flux.AdamW(0.0001), [model, latent_params])
 end
         
 loss(m, x, y) = Flux.Losses.mse(m(x), y)
