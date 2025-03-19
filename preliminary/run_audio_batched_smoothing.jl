@@ -32,7 +32,7 @@ FS = 48000.0f0
 
 T = 1.0f0
 
-blocksize = Int(FS/8)
+blocksize = Int(FS/20)
 
 t = Float32.(0:(1/FS):(T-(1/FS)))
 
@@ -55,8 +55,8 @@ y = tanh.(control1 .+ control2 .* x)
 sigmas = Float32.([1/f1, 1/f2] ./ 8)
 num_latent_variables = length(sigmas)
 
-lower_bandwidth = 1.5
-upper_bandwidth = 1.1
+lower_bandwidth = 2
+upper_bandwidth = 2
 band1 = (f1 / lower_bandwidth, f1 * upper_bandwidth)
 band2 = (f2 / lower_bandwidth, f2 * upper_bandwidth)
 
@@ -115,7 +115,7 @@ if init
         Flux.Conv((1,), width=>1)
     ) |> g
 
-    opt = Flux.setup(Flux.AdamW(0.0005), [model, latent_params])
+    opt = Flux.setup(Flux.AdamW(0.001), [model, latent_params])
 end
         
 loss(m, x, y) = Flux.Losses.mse(m(x), y)
