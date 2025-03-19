@@ -20,6 +20,7 @@ import DSP
 println("Initial setup...")
 
 include("../basis.jl")
+include("../varying_noise.jl")
 
 g = Flux.gpu
 c = Flux.cpu
@@ -32,13 +33,14 @@ FS = 48000.0f0
 
 T = 1.0f0
 
-blocksize = Int(FS/20)
+blocksize = Int(FS/4)
 
 t = Float32.(0:(1/FS):(T-(1/FS)))
 
 N_data = length(t)
 
-x = randn(Float32, N_data, 1, 1) |> g
+# x = randn(Float32, N_data, 1, 1) |> g
+x = 10.0f0 .* varying_noise(N_data, 1000, 8, FS) |> g
 
 f1 = 6.1653f0
 f2 = 36.3421f0
@@ -52,6 +54,8 @@ control2 = 1.0f0 .* cos.(2*pi*f2*t) |> g
 
 y = tanh.(control1 .+ control2 .* x)
 
+x = x ./ 10.0f0
+
 sigmas = Float32.([1/f1, 1/f2] ./ 8)
 num_latent_variables = length(sigmas)
 
@@ -60,7 +64,8 @@ upper_bandwidth = 2
 band1 = (f1 / lower_bandwidth, f1 * upper_bandwidth)
 band2 = (f2 / lower_bandwidth, f2 * upper_bandwidth)
 
-downsampling = 200
+downsampling = 20
+
 upsampling_model = Flux.ConvTranspose([(i == j ? 1.0f0 : 0.0f0) for k = 1:downsampling, i = 1:num_latent_variables, j = 1:num_latent_variables], stride=downsampling) |> g
 
 smoothing_kernel_half_length = Int(ceil(3 * maximum(sigmas) * FS/(2*downsampling)))
@@ -151,7 +156,7 @@ for m in 1:20000;
         titlefontsize=4,
         margin=1Measures.mm,
         padding=1Measures.mm,
-        linewidth=0.25,
+        linewidth=0.02,
     ) |> display
 
     # Plots.plot(latent_params |> c) |> display
