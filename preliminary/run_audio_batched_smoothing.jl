@@ -32,7 +32,7 @@ FS = 48000.0f0
 
 T = 1.0f0
 
-blocksize = Int(FS/4)
+blocksize = Int(FS/8)
 
 t = Float32.(0:(1/FS):(T-(1/FS)))
 
@@ -60,18 +60,10 @@ upper_bandwidth = 1.1
 band1 = (f1 / lower_bandwidth, f1 * upper_bandwidth)
 band2 = (f2 / lower_bandwidth, f2 * upper_bandwidth)
 
-downsampling = 10
+downsampling = 200
 upsampling_model = Flux.ConvTranspose([(i == j ? 1.0f0 : 0.0f0) for k = 1:downsampling, i = 1:num_latent_variables, j = 1:num_latent_variables], stride=downsampling) |> g
 
-smoothing_kernel_half_length = Int(ceil(8 * maximum(sigmas) * FS/(2*downsampling)))
-# smoothing_kernels = gaussian(zeros(1,1,1), reshape(sigmas*(FS/downsampling), 1, 2,1), reshape(-smoothing_kernel_half_length:smoothing_kernel_half_length, :, 1, 1))
-# smoothing_kernels = smoothing_kernels ./ sum(smoothing_kernels, dims=1) 
-# smoothing_weights = zeros(2*smoothing_kernel_half_length+1, 2, 2)
-# for n in 1:num_latent_variables
-#     smoothing_weights[:,n:n,n:n] = smoothing_kernels[:,n:n,:]
-# end
-# 
-# smoothing_weights[:,2,2] = smoothing_weights[:,2,2] .- smoothing_weights[:,1,1]
+smoothing_kernel_half_length = Int(ceil(3 * maximum(sigmas) * FS/(2*downsampling)))
 
 smoothing_kernels = ones(2*smoothing_kernel_half_length+1, 2)
 
@@ -84,9 +76,17 @@ for n in 1:num_latent_variables
     smoothing_weights[:,n:n,n:n] = smoothing_kernels[:,n:n,:]
 end
 
-
 smoothing_weights = smoothing_weights |> g
 smoothing_model = Flux.Conv(smoothing_weights) |> g
+
+reconstruction_kernel = DSP.Filters.digitalfilter(DSP.Filters.Lowpass((band2[2] / 24000)...), DSP.FIRWindow(ones(downsampling*2*smoothing_kernel_half_length+1)))
+
+reconstruction_weights = zeros(downsampling*2*smoothing_kernel_half_length+1, 2, 2)
+for n in 1:num_latent_variables
+    reconstruction_weights[:,n:n,n:n] = reconstruction_kernel
+end
+
+reconstruction_model = Flux.Conv(reconstruction_weights, pad=Flux.SamePad()) |> g
 
 if init
     latent_params = 1.0f-5 * randn(Float32, Int(ceil((length(x)/downsampling)))+(2*smoothing_kernel_half_length), num_latent_variables) |> g
@@ -115,7 +115,7 @@ if init
         Flux.Conv((1,), width=>1)
     ) |> g
 
-    opt = Flux.setup(Flux.AdamW(0.0001), [model, latent_params])
+    opt = Flux.setup(Flux.AdamW(0.0005), [model, latent_params])
 end
         
 loss(m, x, y) = Flux.Losses.mse(m(x), y)
@@ -139,7 +139,7 @@ sample_loss = 0
 
 # Profile.@profile 
 for m in 1:20000;
-    the_latent = upsampling_model(smoothing_model(reshape(latent_params, :, num_latent_variables, 1)))
+    the_latent = reconstruction_model(upsampling_model(smoothing_model(reshape(latent_params, :, num_latent_variables, 1))))
     # the_latent = latent(gaussian, centers, sigmas, reshape(t, :, 1, 1, 1)|>g, latent_params) - latent(gaussian, centers, 10 .* sigmas, reshape(t, :, 1, 1, 1)|>g, latent_params)
     
     Plots.plot(
@@ -176,8 +176,10 @@ for m in 1:20000;
                 
                 local upsampled_latent = upsampling_model(smoothed_latent)
                 
+                local reconstructed_latent = reconstruction_model(upsampled_latent)
+                
                 # lp = cat([params[2][index_block[:,b], :] for b in 1:size(x_block, 3)]..., dims=3)
-                l = loss(params[1], cat(x_block, upsampled_latent, dims=2), y_block)
+                l = loss(params[1], cat(x_block, reconstructed_latent, dims=2), y_block)
                 # lp_l = latent(gaussian, centers, sigmas .* 20, reshape(centers, :, 1, 1, 1), p)
 
                 sample_loss = l
