@@ -90,7 +90,7 @@ centers = reshape(centers, 1, length(centers), 1, 1)
 
 if init
   # latent_params = Float32.(0.00000000001f0 * randn(1, num_basis_functions, num_latent, 1)) |> g
-  latent_params = Float32.(0.1f0 * randn(1, num_basis_functions, num_latent, 1)) |> g
+  latent_params = Float32.(1.0f-8 * randn(1, num_basis_functions, num_latent, 1)) |> g
   # latent_params = latent_params ./ maximum(abs.(latent_params), dims=2)
 end
 
@@ -117,7 +117,7 @@ if init
   
   width = [32, 16]
   
-  activation = Flux.celu
+  activation = Flux.tanh
   # activation = Flux.tanh
   model = Flux.Chain(
     Flux.Conv((1,), (1+num_latent)=>width[1]),
@@ -159,7 +159,7 @@ end
 
 I = eye(num_latent) 
 
-for m in 1:5000;
+for k in 1:5000;
     losses = []
     for n in 1:1; 
         batchsize = 8
@@ -174,12 +174,14 @@ for m in 1:5000;
             the_loss, the_grads = Flux.withgradient([model, latent_params]) do params
                 local m = params[1]
                 local latent_params = params[2]
-                local the_latents = latent(gaussian, centers, sigmas, t_block, latent_params)
+                ps = latent_params + 1 * max(0,0f0, (1.0f0 - (k/100.0f0))) * g(randn(Float32, size(latent_params)))
+                # local the_latents = latent(gaussian, centers, sigmas, t_block, latent_params + max(0,0f0, (1.0f0 - (k/200.0f0))) * g(randn(Float32, size(latent_params))))
+                local the_latents = latent(gaussian, centers, sigmas, t_block, ps) # - latent(gaussian, centers, 40 .* sigmas, t_block, ps)
                 the_latents = resample_model(the_latents)
                 # the_latents = the_latents .+ g(0.01f0 .* randn(Float32, size(the_latents)))
                 # local the_latents = zeros(Float32, size(x_block, 1), 3, size(x_block, 3)) |> g                
 
-               loss(m, cat(x_block, the_latents, dims=2), y_block[(1+offset):end, :, :] |> g) + 1.0f0 * sum(latent(gaussian, centers, sigmas .* 40, reshape(centers, :, 1, 1, 1), latent_params).^2) # + sum((0.001 .- Statistics.var(latent_params, dims=2)).^2) # +  sum(latent_params.^2) # sum((g(0.001 .* ones(1, 3, 1)) .- sum((latent(gaussian, centers, sigmas, reshape(centers, :, 1, 1, 1), latent_params) .- latent(gaussian, centers, sigmas .* 80, reshape(centers, :, 1, 1, 1), latent_params)).^2 ./ length(centers), dims=1)).^2)
+               loss(m, cat(x_block, the_latents, dims=2), y_block[(1+offset):end, :, :] |> g) # + 1.0f0 * sum(latent(gaussian, centers, sigmas .* 40, reshape(centers, :, 1, 1, 1), latent_params).^2) # + sum((0.001 .- Statistics.var(latent_params, dims=2)).^2) # +  sum(latent_params.^2) # sum((g(0.001 .* ones(1, 3, 1)) .- sum((latent(gaussian, centers, sigmas, reshape(centers, :, 1, 1, 1), latent_params) .- latent(gaussian, centers, sigmas .* 80, reshape(centers, :, 1, 1, 1), latent_params)).^2 ./ length(centers), dims=1)).^2)
                 # + 0.01f0 * sum((I .- cov(latent_params[1,:,:,1])).^2) + 0.0001f0 * sum(Statistics.mean(latent_params, dims=1).^2)
             end
             push!(losses, the_loss)
@@ -189,7 +191,7 @@ for m in 1:5000;
         end
         print(">")
     end; 
-    display((lr, m, Statistics.mean(losses)))
+    display((lr, k, Statistics.mean(losses)))
 
     if Statistics.mean(losses) < 1f-3 && adjusted == 0
       global lr *= 0.5
@@ -203,7 +205,9 @@ for m in 1:5000;
       global adjusted = 2
     end
 
+    # l = latent(gaussian, centers, sigmas, t_blocks_reduced[1:1, :, :, :], latent_params)
+    l = latent(gaussian, centers, sigmas, t_blocks_reduced[1:1, :, :, :], latent_params) # - latent(gaussian, centers, 40 .* sigmas, t_blocks_reduced[1:1, :, :, :], latent_params)
     for k in 1:length(sigmas)
-      UnicodePlots.lineplot(latent(gaussian, centers, sigmas, t_blocks_reduced[1:1, :, :, :], latent_params)[1,k,:]|>c, width=displaysize(stdout)[2]-20) |> display
+      UnicodePlots.lineplot(l[1,k,:]|>c, width=displaysize(stdout)[2]-20) |> display
     end
 end
