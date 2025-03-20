@@ -42,9 +42,8 @@ N_data = length(t)
 # x = randn(Float32, N_data, 1, 1) |> g
 x = 10.0f0 .* varying_noise(N_data, 1000, 8, FS) |> g
 
-f1 = 6.1653f0
-f2 = 36.3421f0
-p2 = 1/f2
+f1 = 3.1653f0
+f2 = 31.3421f0
 
 control1 = 1.0f0 .* (sin.(2*pi*f1*t.+0.1) .+ 1.2f0)  |> g
 # f1 = 5.0f-1
@@ -60,21 +59,26 @@ sigmas = Float32.([1/f1, 1/f2] ./ 8)
 num_latent_variables = length(sigmas)
 
 lower_bandwidth = 2
-upper_bandwidth = 2
+upper_bandwidth = 1.5
 band1 = (f1 / lower_bandwidth, f1 * upper_bandwidth)
 band2 = (f2 / lower_bandwidth, f2 * upper_bandwidth)
 
-downsampling = 20
+downsampling = 400
 
 upsampling_model = Flux.ConvTranspose([(i == j ? 1.0f0 : 0.0f0) for k = 1:downsampling, i = 1:num_latent_variables, j = 1:num_latent_variables], stride=downsampling) |> g
 
 smoothing_kernel_half_length = Int(ceil(3 * maximum(sigmas) * FS/(2*downsampling)))
 
+smoothing_window = ones
+smoothing_window = DSP.Windows.hanning
+
+# smoothing_window = DSP.Windows.hanning(2*smoothing_kernel_half_length+1)
+
 smoothing_kernels = ones(2*smoothing_kernel_half_length+1, 2)
 
-smoothing_kernels[:,1] = DSP.Filters.digitalfilter(DSP.Filters.Bandpass((band1./(24000/downsampling))...), DSP.FIRWindow(smoothing_kernels[:,1]))
+smoothing_kernels[:,1] = DSP.Filters.digitalfilter(DSP.Filters.Bandpass(band1...), DSP.FIRWindow(smoothing_window(2*smoothing_kernel_half_length+1)); fs=FS/downsampling)
 
-smoothing_kernels[:,2] = DSP.Filters.digitalfilter(DSP.Filters.Bandpass((band2./(24000/downsampling))...), DSP.FIRWindow(smoothing_kernels[:,2]))
+smoothing_kernels[:,2] = DSP.Filters.digitalfilter(DSP.Filters.Bandpass(band2...), DSP.FIRWindow(smoothing_window(2*smoothing_kernel_half_length+1)); fs=FS/downsampling)
 
 smoothing_weights = zeros(2*smoothing_kernel_half_length+1, 2, 2)
 for n in 1:num_latent_variables
@@ -84,7 +88,10 @@ end
 smoothing_weights = smoothing_weights |> g
 smoothing_model = Flux.Conv(smoothing_weights) |> g
 
-reconstruction_kernel = DSP.Filters.digitalfilter(DSP.Filters.Lowpass((band2[2] / 24000)...), DSP.FIRWindow(ones(downsampling*2*smoothing_kernel_half_length+1)))
+# reconstruction_window = ones
+reconstruction_window = DSP.Windows.hanning
+
+reconstruction_kernel = DSP.Filters.digitalfilter(DSP.Filters.Lowpass(FS/(4*downsampling)), DSP.FIRWindow(reconstruction_window(downsampling*2*smoothing_kernel_half_length+1)); fs=FS)
 
 reconstruction_weights = zeros(downsampling*2*smoothing_kernel_half_length+1, 2, 2)
 for n in 1:num_latent_variables
@@ -116,7 +123,7 @@ width = 8
 if init 
     model = Flux.Chain(
         Flux.Conv((1,), (1+num_latent_variables)=>width), 
-        [Flux.Conv((1,), width=>width, Flux.tanh) for n in 1:8]...,
+        [Flux.Conv((1,), width=>width, Flux.celu) for n in 1:8]...,
         Flux.Conv((1,), width=>1)
     ) |> g
 
@@ -162,7 +169,7 @@ for m in 1:20000;
     # Plots.plot(latent_params |> c) |> display
     losses = []
     sample_losses = []
-    for n in 1:1; 
+    @time for n in 1:1; 
         batchsize = 1
         data_loader = Flux.MLUtils.DataLoader((x_blocks, y_blocks, index_blocks), batchsize=batchsize, shuffle=true)
         print("<")
