@@ -42,8 +42,8 @@ N_data = length(t)
 # x = randn(Float32, N_data, 1, 1) |> g
 x = varying_noise(N_data, 1000, 8, FS) |> g
 
-f1 = 7.1653f0
-f2 = 31.3421f0
+f1 = 16.1653f0
+f2 = 81.3421f0
 
 control1 = 1.0f0 .* (sin.(2*pi*f1*t.+0.1) .+ 1.2f0)  |> g
 # f1 = 5.0f-1
@@ -53,18 +53,18 @@ control2 = 1.0f0 .* cos.(2*pi*f2*t) |> g
 
 y = tanh.(control1 .+ control2 .* x * 30)
 
-lower_bandwidth = 3
+lower_bandwidth = 2
 upper_bandwidth = 2
 
 bands = [
-    (f1 / lower_bandwidth, f1 * upper_bandwidth),
-    (f2 / lower_bandwidth, f2 * upper_bandwidth)
+    f1 / lower_bandwidth  f1 * upper_bandwidth
+    f2 / lower_bandwidth  f2 * upper_bandwidth
 ]
 
 sigmas = Float32.([1/f1, 1/f2] ./ 8)
-num_latent_variables = length(bands)
+num_latent_variables = size(bands, 1)
 
-downsampling = 500
+downsampling = 100
 
 upsampling_model = Flux.ConvTranspose([(i == j ? 1.0f0 : 0.0f0) for k = 1:downsampling, i = 1:num_latent_variables, j = 1:num_latent_variables], stride=downsampling) |> g
 
@@ -77,9 +77,9 @@ smoothing_window = DSP.Windows.hanning
 
 smoothing_kernels = ones(2*smoothing_kernel_half_length+1, 2)
 
-smoothing_kernels[:,1] = DSP.Filters.digitalfilter(DSP.Filters.Bandpass(band1...), DSP.FIRWindow(smoothing_window(2*smoothing_kernel_half_length+1)); fs=FS/downsampling)
+smoothing_kernels[:,1] = DSP.Filters.digitalfilter(DSP.Filters.Bandpass(bands[1,:]...), DSP.FIRWindow(smoothing_window(2*smoothing_kernel_half_length+1)); fs=FS/downsampling)
 
-smoothing_kernels[:,2] = DSP.Filters.digitalfilter(DSP.Filters.Bandpass(band2...), DSP.FIRWindow(smoothing_window(2*smoothing_kernel_half_length+1)); fs=FS/downsampling)
+smoothing_kernels[:,2] = DSP.Filters.digitalfilter(DSP.Filters.Bandpass(bands[2,:]...), DSP.FIRWindow(smoothing_window(2*smoothing_kernel_half_length+1)); fs=FS/downsampling)
 
 smoothing_weights = zeros(2*smoothing_kernel_half_length+1, 2, 2)
 for n in 1:num_latent_variables
@@ -124,7 +124,7 @@ width = 8
 if init 
     model = Flux.Chain(
         Flux.Conv((1,), (1+num_latent_variables)=>width), 
-        [Flux.Conv((1,), width=>width, Flux.celu) for n in 1:8]...,
+        [Flux.Conv((1,), width=>width, Flux.tanh) for n in 1:8]...,
         Flux.Conv((1,), width=>1)
     ) |> g
 
@@ -137,16 +137,16 @@ loss(m, x, y) = Flux.Losses.mse(m(x), y)
 println("Entering training loop...")
 
 # time, value pairs per control
-finetuning = [
-    [
-        [0, T],
-        [-0.1f0, 0.1f0]
-    ],
-    [
-        [[t for t in 0:p2:T];[t for t in (p2/2):p2:T]],
-        [[-1.0f-1 for t in 0:p2:T];[1.0f-1 for t in (p2/2):p2:T]]
-    ]
-] |> g
+# finetuning = [
+#     [
+#         [0, T],
+#         [-0.1f0, 0.1f0]
+#     ],
+#     [
+#         [[t for t in 0:p2:T];[t for t in (p2/2):p2:T]],
+#         [[-1.0f-1 for t in 0:p2:T];[1.0f-1 for t in (p2/2):p2:T]]
+#     ]
+# ] |> g
 
 # Profile.@profile 
 for m in 1:20000;
