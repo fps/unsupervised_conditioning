@@ -49,26 +49,30 @@ control1 = 1.0f0 .* (sin.(2*pi*f1*t.+0.1) .+ 1.2f0)  |> g
 # f1 = 5.0f-1
 # control1 = collect(0:(1/N_data):(1-(1/N_data))) |> g
 
-control2 = 1.0f0 .* cos.(2*pi*f2*t) |> g
+control2 = (1.0f0 .* cos.(2*pi*f2*t)).^1 |> g
 
 y = tanh.(control1 .+ control2 .* x * 30)
 
-lower_bandwidth = 2
+lower_bandwidth = 3
 upper_bandwidth = 2
+
+# f1 = f2
 
 bands = [
     f1 / lower_bandwidth  f1 * upper_bandwidth
     f2 / lower_bandwidth  f2 * upper_bandwidth
 ]
 
-sigmas = Float32.([1/f1, 1/f2] ./ 8)
+# sigmas = Float32.([1/f1, 1/f2] ./ 8)
+sigmas = nothing
 num_latent_variables = size(bands, 1)
 
 downsampling = 100
 
 upsampling_model = Flux.ConvTranspose([(i == j ? 1.0f0 : 0.0f0) for k = 1:downsampling, i = 1:num_latent_variables, j = 1:num_latent_variables], stride=downsampling) |> g
 
-smoothing_kernel_half_length = Int(ceil(6 * maximum(sigmas) * FS/(2*downsampling)))
+# smoothing_kernel_half_length = Int(ceil(6 * maximum(sigmas) * FS/(2*downsampling)))
+smoothing_kernel_half_length = Int(ceil((FS/downsampling) / (2 * 4 * minimum(bands))))
 
 smoothing_window = ones
 smoothing_window = DSP.Windows.hanning
@@ -150,7 +154,7 @@ println("Entering training loop...")
 
 # Profile.@profile 
 for m in 1:20000;
-    the_latent = reconstruction_model(upsampling_model(smoothing_model(reshape(latent_params, :, num_latent_variables, 1))))
+    global the_latent = reconstruction_model(upsampling_model(smoothing_model(reshape(latent_params, :, num_latent_variables, 1))))
     # the_latent = latent(gaussian, centers, sigmas, reshape(t, :, 1, 1, 1)|>g, latent_params) - latent(gaussian, centers, 10 .* sigmas, reshape(t, :, 1, 1, 1)|>g, latent_params)
     
     Plots.plot(
@@ -167,6 +171,8 @@ for m in 1:20000;
         linewidth=0.02,
     ) |> display
 
+    # sleep(0.1)
+    
     # Plots.plot(latent_params |> c) |> display
     losses = []
     sample_losses = []
