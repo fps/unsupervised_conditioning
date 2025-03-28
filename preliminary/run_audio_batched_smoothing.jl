@@ -16,126 +16,145 @@ import Random
 import Profile
 import DSP
 
-
-println("Initial setup...")
-
-include("../basis.jl")
-include("../varying_noise.jl")
-
-g = Flux.gpu
-c = Flux.cpu
-g = g
-
-
-println("Creating synthetic training data...")
-
-FS = 48000.0f0
-
-T = 1.0f0
-
-blocksize = Int(FS/8)
-
-t = Float32.(0:(1/FS):(T-(1/FS)))
-
-N_data = length(t)
-
-# x = randn(Float32, N_data, 1, 1) |> g
-x = varying_noise(N_data, 1000, 8, FS) |> g
-
-f1 = 16.1653f0
-f2 = 81.3421f0
-
-control1 = 1.0f0 .* (sin.(2*pi*f1*t.+0.1) .+ 1.2f0)  |> g
-# f1 = 5.0f-1
-# control1 = collect(0:(1/N_data):(1-(1/N_data))) |> g
-
-control2 = (1.0f0 .* cos.(2*pi*f2*t)).^1 |> g
-
-y = tanh.(control1 .+ control2 .* x * 30)
-
-lower_bandwidth = 3
-upper_bandwidth = 2
-
-# f1 = f2
-
-bands = [
-    f1 / lower_bandwidth  f1 * upper_bandwidth
-    f2 / lower_bandwidth  f2 * upper_bandwidth
-]
-
-# sigmas = Float32.([1/f1, 1/f2] ./ 8)
-sigmas = nothing
-num_latent_variables = size(bands, 1)
-
-downsampling = 100
-
-upsampling_model = Flux.ConvTranspose([(i == j ? 1.0f0 : 0.0f0) for k = 1:downsampling, i = 1:num_latent_variables, j = 1:num_latent_variables], stride=downsampling) |> g
-
-# smoothing_kernel_half_length = Int(ceil(6 * maximum(sigmas) * FS/(2*downsampling)))
-smoothing_kernel_half_length = Int(ceil((FS/downsampling) / (2 * 4 * minimum(bands))))
-
-smoothing_window = ones
-smoothing_window = DSP.Windows.hanning
-
-# smoothing_window = DSP.Windows.hanning(2*smoothing_kernel_half_length+1)
-
-smoothing_kernels = ones(2*smoothing_kernel_half_length+1, 2)
-
-smoothing_kernels[:,1] = DSP.Filters.digitalfilter(DSP.Filters.Bandpass(bands[1,:]...), DSP.FIRWindow(smoothing_window(2*smoothing_kernel_half_length+1)); fs=FS/downsampling)
-
-smoothing_kernels[:,2] = DSP.Filters.digitalfilter(DSP.Filters.Bandpass(bands[2,:]...), DSP.FIRWindow(smoothing_window(2*smoothing_kernel_half_length+1)); fs=FS/downsampling)
-
-smoothing_weights = zeros(2*smoothing_kernel_half_length+1, 2, 2)
-for n in 1:num_latent_variables
-    smoothing_weights[:,n:n,n:n] = smoothing_kernels[:,n:n,:]
-end
-
-smoothing_weights = smoothing_weights |> g
-smoothing_model = Flux.Conv(smoothing_weights) |> g
-
-# reconstruction_window = ones
-reconstruction_window = DSP.Windows.hanning
-
-reconstruction_kernel = DSP.Filters.digitalfilter(DSP.Filters.Lowpass(FS/(4*downsampling)), DSP.FIRWindow(reconstruction_window(downsampling*2*smoothing_kernel_half_length+1)); fs=FS)
-
-reconstruction_weights = zeros(downsampling*2*smoothing_kernel_half_length+1, 2, 2)
-for n in 1:num_latent_variables
-    reconstruction_weights[:,n:n,n:n] = reconstruction_kernel
-end
-
-reconstruction_model = Flux.Conv(reconstruction_weights) |> g
+include("../divisors.jl")
 
 if init
-    latent_params = 1.0f-5 * randn(Float32, Int(ceil((length(x)/downsampling)))+(4*smoothing_kernel_half_length), num_latent_variables) |> g
+    println("Initial setup...")
+
+    include("../varying_noise.jl")
+
+    global g = Flux.gpu
+    global c = Flux.cpu
+    global g = g
+
+
+    println("Creating synthetic training data...")
+
+    global FS = 48000.0f0
+
+    global T = 1.0f0
+
+    global blocksize = Int(FS/8)
+
+    global t = Float32.(0:(1/FS):(T-(1/FS)))
+
+    global N_data = length(t)
+
+    # x = randn(Float32, N_data, 1, 1) |> g
+    global x = varying_noise(N_data, 1000, 8, FS) |> g
+
+    function triangle(t)
+        2 .* ifelse.(mod.(t, 2*pi) .< pi, mod.(t, pi)/pi , 1 .- mod.(t.-pi, pi)/pi) .- 1
+    end
+
+    global f1 = 2.1653f0
+    global f2 = 81.3421f0
+
+    global control1 = 1.0f0 .* (sin.(2*pi*f1*t.+0.1) .+ 1.2f0)  |> g
+    # f1 = 5.0f-1
+    # control1 = collect(0:(1/N_data):(1-(1/N_data))) |> g
+
+    global control2 = (1.0f0 .* cos.(2*pi*f2*t)).^1 |> g
+
+    global y = tanh.(control1 .+ control2 .* x * 30)
+
+    global lower_bandwidth = 3
+    global upper_bandwidth = 3
+
+    # f1 = f2
+
+    global bands = [
+        f1 / lower_bandwidth  f1 * upper_bandwidth
+        f2 / lower_bandwidth  f2 * upper_bandwidth
+    ]
+
+    global num_latent_variables = size(bands, 1)
+
+    global downsampling = zeros(Int, num_latent_variables)
+
+    for n in 1:num_latent_variables
+        downsampling[n] = reverse(divisors(blocksize))[findmax(reverse((FS ./ (2*divisors(blocksize)) .> maximum(bands[n,:]))))[2]]
+    end
+
+    # global downsampling = [100 100]
+    println("downsampling: $(downsampling)")
+
+    global upsampling_models = [
+        Flux.ConvTranspose(ones(Float32, d, 1, 1), stride=d) |> g
+            
+        for d in downsampling
+    ]
+
+    global smoothing_kernel_half_lengths = [
+        Int(ceil((FS/downsampling[n]) / (2 * minimum(bands[n,:]))))
+                                                            
+        for n in 1:num_latent_variables
+    ]
+
+    global smoothing_kernel_lengths = smoothing_kernel_half_lengths .* 2 .+ 1
+
+    # smoothing_window = ones
+    global smoothing_window = DSP.Windows.hanning
+
+    global smoothing_models = [
+        Flux.Conv(
+            repeat(
+                DSP.Filters.digitalfilter(DSP.Filters.Bandpass(bands[n,:]...), DSP.FIRWindow(smoothing_window(smoothing_kernel_lengths[n])); fs=FS/downsampling[n])
+                , 1, 1, 1
+            )
+        ) |> g
+
+        for n in 1:num_latent_variables
+    ]
+    # reconstruction_window = ones
+    global reconstruction_window = DSP.Windows.hanning
+
+    global reconstruction_models = [
+        Flux.Conv(
+            repeat(
+                DSP.Filters.digitalfilter(DSP.Filters.Lowpass(FS/(4*downsampling[n])), DSP.FIRWindow(reconstruction_window(downsampling[n]*2*smoothing_kernel_half_lengths[n]+1)); fs=FS)
+                , 1, 1, 1
+            )
+        ) |> g
+            
+        for n in 1:num_latent_variables
+    ]
+
+    global latent_models = [
+        x -> x |> smoothing_models[n] |> upsampling_models[n] |> reconstruction_models[n]
+        for n in 1:num_latent_variables
+    ]
+
+    global latent_params = [
+        1.0f-5 * randn(Float32, Int(ceil((length(x)/downsampling[n])))+(4*smoothing_kernel_half_lengths[n]), 1, 1) |> g
+        
+        for n in 1:num_latent_variables
+    ]
+    
     # scales = 1.0f0 * randn(Float32, 1, 1, num_latent_variables, 1)  |> g
-end
+    
+    println("Dividing data into blocks...")
+
+    global x_blocks = reshape(x, blocksize, 1, :) |> g
+    global y_blocks = reshape(y, blocksize, 1, :) |> g
+    # latent_params_blocks = reshape(latent_params, blocksize, num_latent_variables, :) |> g
+    global index_blocks = reshape(1:length(x), blocksize, :) |> g
 
 
-println("Dividing data into blocks...")
-
-index_blocksize = Int(ceil((blocksize / downsampling)))
-
-x_blocks = reshape(x, blocksize, 1, :) |> g
-y_blocks = reshape(y, blocksize, 1, :) |> g
-# latent_params_blocks = reshape(latent_params, blocksize, num_latent_variables, :) |> g
-index_blocks = reshape(1:(Int(ceil(length(x) / downsampling))), index_blocksize, :) |> g
-
-
-println("Setting up model...")
-
-width = 8
-
-if init 
-    model = Flux.Chain(
+    println("Setting up model...")
+    
+    global width = 8
+    global model = Flux.Chain(
         Flux.Conv((1,), (1+num_latent_variables)=>width), 
         [Flux.Conv((1,), width=>width, Flux.tanh) for n in 1:8]...,
         Flux.Conv((1,), width=>1)
     ) |> g
 
-    opt = Flux.setup(Flux.AdamW(0.001), [model, latent_params])
+    global opt = Flux.setup(Flux.AdamW(0.001), [model, latent_params])
+    
+    global loss(m, x, y) = Flux.Losses.mse(m(x), y)
 end
         
-loss(m, x, y) = Flux.Losses.mse(m(x), y)
 
 
 println("Entering training loop...")
@@ -152,16 +171,25 @@ println("Entering training loop...")
 #     ]
 # ] |> g
 
+function downsample_index(index, factor)
+    Int(round(index / factor, RoundUp))
+end
+
 # Profile.@profile 
 for m in 1:20000;
-    global the_latent = reconstruction_model(upsampling_model(smoothing_model(reshape(latent_params, :, num_latent_variables, 1))))
+    global the_latent = [
+        latent_params[n] |> latent_models[n]
+        for n in 1:num_latent_variables
+    ]
+    
+    # println(size.(the_latent))
     # the_latent = latent(gaussian, centers, sigmas, reshape(t, :, 1, 1, 1)|>g, latent_params) - latent(gaussian, centers, 10 .* sigmas, reshape(t, :, 1, 1, 1)|>g, latent_params)
     
     Plots.plot(
         Plots.plot(x[:,1,1] |> c, title="Training input", legend=:none), 
         Plots.plot(y[:,1,1] |> c, title="Training output", legend=:none),
-        Plots.plot(model(cat(x, the_latent, dims=2))[:,1,1] |> c, title="Model output", legend=:none),
-        [ Plots.plot((the_latent)[:,n,1] |> c, title="Inferred control input $(n)", legend=:none) for n in 1:num_latent_variables]...,
+        Plots.plot(model(cat(x, the_latent..., dims=2))[:,1,1] |> c, title="Model output", legend=:none),
+        [ Plots.plot(the_latent[n][:,1,1] |> c, title="Inferred control input $(n)", legend=:none) for n in 1:num_latent_variables]...,
         layout=(3+num_latent_variables,1),
         ytickfontsize=4,
         xtickfontsize=4,
@@ -187,16 +215,31 @@ for m in 1:20000;
             # display(upsampling_model(smoothing_model(cat([latent_params[index_block[1, b]:(2*smoothing_kernel_half_length + index_block[end, b]), :] for b in 1:size(x, 3)]..., dims=3))))
             print(".")
             the_loss, the_grads = Flux.withgradient([model, latent_params]) do params
-                # l = loss(params[1], cat(x_block, [params[2][index_block, d, :] for d in 1:num_latent_variables]..., dims=2), y_block)
+                local the_latent_blocks = [
+                    cat([
+                        params[2][n][
+                            downsample_index(index_block[1,b], downsampling[n]):(downsample_index(index_block[end, b], downsampling[n]) + 4*smoothing_kernel_half_lengths[n]),
+                            :,
+                            :
+                        ]
+                        for b in 1:size(x_block, 3)
+                    ]..., dims=3)                    
+                    for n in 1:num_latent_variables
+                ]
+                        
+                # println("size.(the_latent_blocks): $(size.(the_latent_blocks))")
                 
-                local smoothed_latent = smoothing_model(cat([params[2][index_block[1, b]:(4*smoothing_kernel_half_length + index_block[end, b]), :] for b in 1:size(x_block, 3)]..., dims=3))
+                local the_latent = cat([
+                    reconstruction_models[n](upsampling_models[n](smoothing_models[n](
+                        the_latent_blocks[n]
+                    )))
+                    for n in 1:num_latent_variables
+                ]..., dims=2)
                 
-                local upsampled_latent = upsampling_model(smoothed_latent)
-                
-                local reconstructed_latent = reconstruction_model(upsampled_latent)
+                # println("size(the_latent): $(size(the_latent))")
                 
                 # lp = cat([params[2][index_block[:,b], :] for b in 1:size(x_block, 3)]..., dims=3)
-                l = loss(params[1], cat(x_block, reconstructed_latent, dims=2), y_block)
+                l = loss(params[1], cat(x_block, the_latent, dims=2), y_block)
                 # lp_l = latent(gaussian, centers, sigmas .* 20, reshape(centers, :, 1, 1, 1), p)
 
                 sample_loss = l
