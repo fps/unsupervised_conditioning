@@ -47,7 +47,7 @@ if init
         2 .* ifelse.(mod.(t, 2*pi) .< pi, mod.(t, pi)/pi , 1 .- mod.(t.-pi, pi)/pi) .- 1
     end
 
-    global f1 = 12.1653f0
+    global f1 = 21.1653f0
     global f2 = 81.3421f0
 
     global control1 = 1.0f0 .* (sin.(2*pi*f1*t.+0.1) .+ 1.2f0)  |> g
@@ -58,8 +58,8 @@ if init
 
     global y = tanh.(control1 .+ control2 .* x * 30)
 
-    global lower_bandwidth = 3
-    global upper_bandwidth = 3
+    global lower_bandwidth = 2
+    global upper_bandwidth = 2
 
     # f1 = f2
 
@@ -156,6 +156,8 @@ if init
     global opt_latent = Flux.setup(Flux.AdamW(0.001), latent_params)
     
     global loss(m, x, y) = Flux.Losses.mse(m(x), y)
+    
+    global latent_update_interval = 10
 end
         
 
@@ -166,10 +168,10 @@ function downsample_index(index, factor)
     Int(round(index / factor, RoundUp))
 end
 
+global the_latent = latent_model(latent_params)
+
 # Profile.@profile 
-for m in 1:20000;
-    global the_latent = latent_model(latent_params)
-    
+for m in 0:20000;
     Plots.plot(
         Plots.plot(x[:,1,1] |> c, title="Training input", legend=:none), 
         Plots.plot(y[:,1,1] |> c, title="Training output", legend=:none),
@@ -200,51 +202,39 @@ for m in 1:20000;
     latent_gradient = zeros(Float32, size(the_latent)) |> g
     
     for (x_block, y_block, index_block) in data_loader
-        print(".")
-        the_loss, the_grads = Flux.withgradient([model, the_latent]) do params
-            # local the_latent_blocks = [
-            #     cat([
-            #         params[2][n][
-            #             downsample_index(index_block[1,b], downsampling[n]):(downsample_index(index_block[end, b], downsampling[n]) + 4*smoothing_kernel_half_lengths[n]),
-            #             :,
-            #             :
-            #         ]
-            #         for b in 1:size(x_block, 3)
-            #     ]..., dims=3)                    
-            #     for n in 1:num_latent_variables
-            # ]
-            #         
-            # local the_latent = cat([
-            #     reconstruction_models[n](upsampling_models[n](smoothing_models[n](
-            #         the_latent_blocks[n]
-            #     )))
-            #     for n in 1:num_latent_variables
-            # ]..., dims=2)
+        if m % latent_update_interval == 0
+            print(":")
+            the_loss, the_grads = Flux.withgradient([model, the_latent]) do params
+                local the_latent_block = cat([params[2][index_block[1,b]:index_block[end,b], :, :] for b in 1:size(x_block,3)]..., dims=3)
+                
+                loss(params[1], cat(x_block, the_latent_block, dims=2), y_block)
+            end
+            push!(losses, the_loss)
+            push!(sample_losses, sample_loss)
             
-            local the_latent_block = cat([params[2][index_block[1,b]:index_block[end,b], :, :] for b in 1:size(x_block,3)]..., dims=3)
+            Flux.update!(opt_model, model, the_grads[1][1])
+            latent_gradient .+= the_grads[1][2]
+        else
+            print(".")
+            the_loss, the_grads = Flux.withgradient(model) do params
+                local the_latent_block = cat([the_latent[index_block[1,b]:index_block[end,b], :, :] for b in 1:size(x_block,3)]..., dims=3)
+                
+                loss(params, cat(x_block, the_latent_block, dims=2), y_block)
+            end
+            push!(losses, the_loss)
+            push!(sample_losses, sample_loss)
             
-            l = loss(params[1], cat(x_block, the_latent_block, dims=2), y_block)
-
-            sample_loss = l
-            
-            l
+            Flux.update!(opt_model, model, the_grads[1])
         end
-        push!(losses, the_loss)
-        push!(sample_losses, sample_loss)
-        
-        # Flux.update!(opt, [model, latent_params], the_grads[1])
-        Flux.update!(opt_model, model, the_grads[1][1])
-        latent_gradient .+= the_grads[1][2]
-        # for n in 1:num_latent_variables
-        #     latent_gradient[n] = latent_gradient[n] .+ the_grads[1][2][n]
-        # end
     end
         
-    if m % 5 == 0
+    if m % latent_update_interval == 0
         the_loss, the_grads = Flux.withgradient(latent_params) do params
             loss(latent_model, params, the_latent - latent_gradient)
         end
         Flux.update!(opt_latent, latent_params, the_grads[1])
+        
+        global the_latent = latent_model(latent_params)
     end
     print(">")
 
