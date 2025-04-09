@@ -303,16 +303,20 @@ latent_models = [
 ] |> g;
 
 # ╔═╡ 99f368ce-918d-4f9e-ab93-2465a3231b48
+#=╠═╡
 [
 	(size(latent_models[n](latents[n])), length(output)) 
 	for n in 1:length(ks)
 ]
+  ╠═╡ =#
 
 # ╔═╡ 42a46b37-7a59-4579-acf4-4fdc064adf54
 md"# Amp model..."
 
 # ╔═╡ e2f756a3-fc49-4695-b430-e51c24bfb358
+#=╠═╡
 offset = 48000 - size(amp_model(randn(Float32, 48000, 4, 1) |> g), 1)
+  ╠═╡ =#
 
 # ╔═╡ 2eaf6618-744a-4734-9916-ec599b678aea
 md"#### Lalala"
@@ -340,7 +344,9 @@ md"#### Data splitting...."
 local n = 2; upsampled_size(ks[n], bandpass_filter_ords[n], lowpass_filter_ord, bandpass_filter_ords[n] + lowpass_filter_ord + 14)
 
 # ╔═╡ a9351e05-f3c7-423c-a19d-d146971e9311
+#=╠═╡
 N_segments = size(latents[1], 1) - (bandpass_filter_ords[1] + lowpass_filter_ord - 1)
+  ╠═╡ =#
 
 # ╔═╡ f28f4b05-1283-42d0-a8c3-42e6beb3200c
 function data_latent(latents, n) 
@@ -354,18 +360,25 @@ function data_latent(latents, n)
 end
 
 # ╔═╡ 49e42117-e5c7-4d08-a9cc-8fb1f931e432
+#=╠═╡
 data_latent(latents, 0)
+  ╠═╡ =#
 
 # ╔═╡ add3ba33-2ab9-4a4c-9852-ac44a158dd4d
+#=╠═╡
 local n = 1; latent_models[n](data_latent(latents, n)[1])
+  ╠═╡ =#
 
 # ╔═╡ f4ea1294-b42d-44cd-8127-ce23ae924296
 md"# Training..."
 
 # ╔═╡ 8de5e53e-48d9-4551-b6b6-22eb3ad54e9f
+#=╠═╡
 opt = Flux.setup(Flux.Optimisers.AdamW(0.001), [latents, amp_model])
+  ╠═╡ =#
 
 # ╔═╡ 713edb4c-3060-481c-82ba-f81c9625ddc3
+#=╠═╡
 function train()
 	perm = Random.randperm(N_segments)
 	ProgressLogging.@progress for p in 1:N_segments
@@ -395,6 +408,7 @@ function train()
 		# @info "loss: $(loss), step: $(p), segment: $(n)"
 	end
 end;
+  ╠═╡ =#
 
 # ╔═╡ b3f6378e-1368-4753-ab19-93823eb73fe5
 # ╠═╡ disabled = true
@@ -406,10 +420,14 @@ end
   ╠═╡ =#
 
 # ╔═╡ 5ed97a67-b15b-4db5-9a5c-301d93022001
+#=╠═╡
 cat([plot(latent_models[n](latents[n])[1:10:end,1,1]|>c, width=1000) for n in 1:3]..., dims=1)
+  ╠═╡ =#
 
 # ╔═╡ 7a25b0e3-3f37-4698-ae5f-6a2819e570ae
+#=╠═╡
 cat([plot(latent_models[n](latents[n])[(90*Int(fs_fender)):1:(150*Int(fs_fender)),1,1]|>c) for n in 1:3]..., dims=1)
+  ╠═╡ =#
 
 # ╔═╡ 13af8626-27b8-4e7e-ab8d-05024c647b59
 GC.gc(true); GC.gc(false)
@@ -472,9 +490,12 @@ md"""$(PlutoUI.LocalResource("../data/test/Take1_Audio 1-1_short.wav", :autoplay
 test_input, fs_test = WAV.wavread("../data/test/Take1_Audio 1-1_short.wav");
 
 # ╔═╡ 8b23470c-3151-488c-856b-4da424f78458
+#=╠═╡
 padded_test_input = [zeros(offset); test_input];
+  ╠═╡ =#
 
 # ╔═╡ 25faf22f-48d7-4b63-903c-0917c9fbafe1
+#=╠═╡
 test_output = amp_model(
 	repeat(
 		cat(
@@ -488,8 +509,10 @@ test_output = amp_model(
 		), 1, 1, 1
 	) |> g
 );
+  ╠═╡ =#
 
 # ╔═╡ 7f6d4069-1aeb-47cd-93b2-c87506bae85d
+#=╠═╡
 begin
 	WAV.wavwrite(
 		test_output[:,1,1] ./ maximum(abs.(test_output)) |> c, 
@@ -500,12 +523,7 @@ begin
 
 	md"""$(PlutoUI.LocalResource("test_output.wav", :autoplay=>true))"""
 end
-
-# ╔═╡ 1a74298e-09b3-4eb2-94d7-cbe581e9e3ba
-latents = saved[:latents_cpu] |> g
-
-# ╔═╡ 556baac4-d9af-4f23-803d-930e17e3f394
-amp_model = saved[:amp_model_cpu] |> g
+  ╠═╡ =#
 
 # ╔═╡ 218ad4ab-9416-4f5d-8125-6709d976943c
 # ╠═╡ disabled = true
@@ -520,6 +538,16 @@ begin
 		Flux.Conv((1,), amp_model_width=>1)
 	) |> g
 end;
+  ╠═╡ =#
+
+# ╔═╡ 556baac4-d9af-4f23-803d-930e17e3f394
+#=╠═╡
+amp_model = saved[:amp_model_cpu] |> g
+  ╠═╡ =#
+
+# ╔═╡ 1a74298e-09b3-4eb2-94d7-cbe581e9e3ba
+#=╠═╡
+latents = saved[:latents_cpu] |> g
   ╠═╡ =#
 
 # ╔═╡ 01337ea9-a833-45e5-ac18-039573e2d4d9
