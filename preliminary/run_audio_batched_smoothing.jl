@@ -153,7 +153,7 @@ if init
 
     # global opt = Flux.setup(Flux.AdamW(0.001), [model, latent_params])
     global opt_model = Flux.setup(Flux.AdamW(0.001), model)
-    global opt_latent = Flux.setup(Flux.AdamW(0.001), latent_params)
+    global opt_latent = Flux.setup(Flux.Adam(0.001), latent_params)
     
     global loss(m, x, y) = Flux.Losses.mse(m(x), y)
     

@@ -4,8 +4,20 @@
 using Markdown
 using InteractiveUtils
 
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    #! format: off
+    return quote
+        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
+        el
+    end
+    #! format: on
+end
+
 # ╔═╡ d7aca48c-154d-11f0-34b2-390278649e9a
-import Flux, BSON, CUDA, cuDNN,WAV, PlutoUI
+import Flux, BSON, CUDA, cuDNN,WAV, PlutoUI, Statistics
 
 # ╔═╡ 3b7dea62-476c-4237-b0b8-a0b1d6daf6cb
 saved = BSON.load("upsampling_model2.bson");
@@ -13,8 +25,20 @@ saved = BSON.load("upsampling_model2.bson");
 # ╔═╡ b392ea82-f697-46f5-a2e2-46ab105332cf
 amp_model = saved[:amp_model_cpu] |> Flux.gpu;
 
+# ╔═╡ d016c3f8-f9e3-4587-ab46-50bc33197d6c
+latent_models = saved[:latent_models_cpu] |> Flux.gpu;
+
+# ╔═╡ e4d38982-ad1c-4549-8072-635d53b4afdb
+latents = saved[:latents_cpu] |> Flux.gpu;
+
+# ╔═╡ 90c07446-d27d-4bd2-848e-acbbb4b287e7
+N_latents = length(latents)
+
+# ╔═╡ f2bcb67c-ef5d-4415-94fa-5f74fbd6a3af
+upsampled_latents = [latent_models[n](latents[n]) for n in 1:N_latents]
+
 # ╔═╡ d4d9e715-f474-415d-9ed5-2510c6808f51
-[(minimum(d), maximum(d)) for d in saved[:latents_cpu]]
+limits = [(minimum(d), maximum(d)) for d in upsampled_latents]
 
 # ╔═╡ 332d529b-a4a3-4308-8dca-bde16a40ca8f
 test_input, fs_test = WAV.wavread("../data/test/Take1_Audio 1-1_short.wav");
@@ -22,20 +46,28 @@ test_input, fs_test = WAV.wavread("../data/test/Take1_Audio 1-1_short.wav");
 # ╔═╡ f79e5f32-5665-49c2-8c56-f44b8970201b
 padded_test_input = [zeros(10000); test_input];
 
+# ╔═╡ 5208225a-1ca9-4ec1-acc8-15458b976733
+@bind param1 PlutoUI.Slider(limits[1][1]:0.0001:limits[1][2], default=Statistics.mean(limits[1]))
+
+# ╔═╡ 3953359d-6213-4c2b-b6ab-9d998486ea45
+@bind param2 PlutoUI.Slider(limits[2][1]:0.0001:limits[2][2], default=Statistics.mean(limits[2]))
+
+# ╔═╡ e7eaaaa0-3546-4bce-b528-175970e4ecaf
+@bind param3 PlutoUI.Slider(limits[3][1]:0.0001:limits[3][2], default=Statistics.mean(limits[3]))
+
+# ╔═╡ 61f68ce3-788d-4d0d-9b20-613c9b24e4a1
+@bind gain PlutoUI.Slider(0:0.0001:1, default=0.1)
+
 # ╔═╡ 925fbe15-f4b3-470a-a2dd-53ece6b9ac66
-test_output = amp_model(
-	repeat(
-		cat(
-			0.1 .* padded_test_input, 
-			[-0.0 -0.0 0.01] .* ones(
-				size(padded_test_input, 1),
-				3, 
-				1
-			),
-			dims=2
-		), 1, 1, 1
-	) |> Flux.gpu
-);
+test_output = amp_model(repeat(cat(
+	gain .* padded_test_input, 
+	[param1 param2 param3] .* ones(
+		size(padded_test_input, 1),
+		3, 
+		1
+	), 
+	dims=2
+), 1, 1, 1) |> Flux.gpu);
 
 # ╔═╡ d0a30bb0-eba1-495d-bcfb-2bd5f68a971f
 begin
@@ -48,8 +80,15 @@ begin
 
 	# sleep(1)
 
-	md"""$(PlutoUI.LocalResource("test_output.wav", :autoplay=>true))"""
+	# md"""$(PlutoUI.LocalResource("test_output.wav", :autoplay=>true))"""
+	md"""$(PlutoUI.LocalResource("test_output.wav"))"""
 end
+
+# ╔═╡ 5eeccf0b-960a-415b-bcd7-b949bd453ddb
+timing_data = randn(Float32, 48000, 4, 1);
+
+# ╔═╡ 49267842-4589-4e7f-ac18-6385c44ef01c
+for n in 1:10; saved[:amp_model_cpu](timing_data); end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -58,6 +97,7 @@ BSON = "fbb218c0-5317-5bc6-957e-2ee96dd4b1f0"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 WAV = "8149f6b0-98f6-5db9-b78f-408fbbb8ef88"
 cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
 
@@ -76,7 +116,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "0d03637c4581125dd4342258aed84d6198187b8d"
+project_hash = "c4226012db978f60b80a585aa2759bc3b2810b66"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1326,10 +1366,20 @@ version = "17.4.0+2"
 # ╠═d7aca48c-154d-11f0-34b2-390278649e9a
 # ╠═3b7dea62-476c-4237-b0b8-a0b1d6daf6cb
 # ╠═b392ea82-f697-46f5-a2e2-46ab105332cf
+# ╠═d016c3f8-f9e3-4587-ab46-50bc33197d6c
+# ╠═e4d38982-ad1c-4549-8072-635d53b4afdb
+# ╠═90c07446-d27d-4bd2-848e-acbbb4b287e7
+# ╠═f2bcb67c-ef5d-4415-94fa-5f74fbd6a3af
 # ╠═d4d9e715-f474-415d-9ed5-2510c6808f51
 # ╠═332d529b-a4a3-4308-8dca-bde16a40ca8f
 # ╠═f79e5f32-5665-49c2-8c56-f44b8970201b
+# ╠═5208225a-1ca9-4ec1-acc8-15458b976733
+# ╠═3953359d-6213-4c2b-b6ab-9d998486ea45
+# ╠═e7eaaaa0-3546-4bce-b528-175970e4ecaf
+# ╠═61f68ce3-788d-4d0d-9b20-613c9b24e4a1
 # ╠═925fbe15-f4b3-470a-a2dd-53ece6b9ac66
 # ╠═d0a30bb0-eba1-495d-bcfb-2bd5f68a971f
+# ╠═5eeccf0b-960a-415b-bcd7-b949bd453ddb
+# ╠═49267842-4589-4e7f-ac18-6385c44ef01c
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

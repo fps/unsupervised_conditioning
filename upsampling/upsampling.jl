@@ -525,6 +525,11 @@ begin
 end
   ╠═╡ =#
 
+# ╔═╡ 556baac4-d9af-4f23-803d-930e17e3f394
+#=╠═╡
+amp_model = saved[:amp_model_cpu] |> g
+  ╠═╡ =#
+
 # ╔═╡ 218ad4ab-9416-4f5d-8125-6709d976943c
 # ╠═╡ disabled = true
 #=╠═╡
@@ -540,16 +545,6 @@ begin
 end;
   ╠═╡ =#
 
-# ╔═╡ 556baac4-d9af-4f23-803d-930e17e3f394
-#=╠═╡
-amp_model = saved[:amp_model_cpu] |> g
-  ╠═╡ =#
-
-# ╔═╡ 1a74298e-09b3-4eb2-94d7-cbe581e9e3ba
-#=╠═╡
-latents = saved[:latents_cpu] |> g
-  ╠═╡ =#
-
 # ╔═╡ 01337ea9-a833-45e5-ac18-039573e2d4d9
 # ╠═╡ disabled = true
 #=╠═╡
@@ -558,6 +553,11 @@ latents = [
 
 	for n in 1:length(ks)
 ] |> g;
+  ╠═╡ =#
+
+# ╔═╡ 1a74298e-09b3-4eb2-94d7-cbe581e9e3ba
+#=╠═╡
+latents = saved[:latents_cpu] |> g
   ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
