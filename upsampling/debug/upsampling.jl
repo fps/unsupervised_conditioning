@@ -1,7 +1,7 @@
 import Pkg
 Pkg.activate(".")
 
-import Flux, CUDA, cuDNN, DSP, Statistics, ProgressLogging, Images, BSON, Dates, Random, WAV
+import Flux, CUDA, cuDNN, DSP, Statistics, ProgressLogging, Images, BSON, Dates, Random, WAV, Format
 
 c = Flux.cpu
 g = Flux.gpu
@@ -9,6 +9,7 @@ g = Flux.gpu
 @info "# Utility functions"
 
 include("../plotting.jl")
+include("../../basis.jl")
 
 function filtord(f_pass, f_stop, ripple, attenuation, fs)
     n = DSP.remezord(f_pass/fs, f_stop/fs, ripple, attenuation)
@@ -85,7 +86,7 @@ plot(upsampling_coeff)
 
 function latent_model(coeff_bp, k, coeff_lo)
     Flux.Chain(
-        Flux.Dropout(0.1, dims=2), 
+        # Flux.Dropout(0.1, dims=2), 
         filtering_model(coeff_bp),
         upsampling_model(k, coeff_lo)
     )
@@ -120,9 +121,9 @@ end
 @info "# Control data..."
 
 control_periods = [
-    [2*length(output) / fs_fender  (1/20)*length(output) / fs_fender],
-    [(1/10)*length(output) / fs_fender  (1/100)*length(output) / fs_fender],
-    [5 1],
+    [2*length(output) / fs_fender  (1/10)*length(output) / fs_fender],
+    [(1/20)*length(output) / fs_fender  (1/200)*length(output) / fs_fender],
+    [5 0.2],
 ]
 
 control_frequencies = [1.0 ./ x for x in control_periods]
@@ -195,7 +196,7 @@ latent_bandpass_models = [ latent_models[n][1] for n in 1:n_ctrls ]
 @info "## Latents"
 
 latents = [
-    1.0f-9 * randn(Float32, latent_sizes[n], 1, 1)
+    1.0f-10* randn(Float32, latent_sizes[n], 1, 1)
 
     for n in 1:n_ctrls
 ] |> g;
@@ -205,6 +206,69 @@ latents = [
 
 bandpassed_latent_sizes = length.(latents) .- (bandpass_filter_ords .- 1)
 
+
+@info "## Amp model"
+
+# begin
+#     amp_model_width=32
+#     
+#     amp_model = Flux.Chain(
+#         Flux.Conv((1,), (1+n_ctrls)=>amp_model_width),
+#         [Flux.Conv((3,), amp_model_width=>amp_model_width, Flux.tanh, dilation=d) for d in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
+#         [Flux.Conv((3,), amp_model_width=>amp_model_width, Flux.tanh, dilation=d) for d in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
+#         Flux.Conv((1,), amp_model_width=>1)
+#     ) |> g
+# end;
+
+include("../AmpModels.jl")
+
+# begin
+# 	struct residual_model
+# 		layers
+#     function residual_model(layers)
+#       new(layers)
+#     end
+# 
+# 		function residual_model(n_channels::Int, amp_model_width::Int)
+# 			new([
+# 				Flux.Conv((1,), n_channels=>amp_model_width),
+# 		        [ Flux.Conv((3,), (amp_model_width+n_channels)=>amp_model_width, Flux.tanh, dilation=d)	for d in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
+# 		        [Flux.Conv((3,), (amp_model_width+n_channels)=>amp_model_width, Flux.tanh, dilation=d) for d in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
+# 		        Flux.Conv((1,), (amp_model_width+n_channels)=>1)
+# 			])
+# 		end
+# 	end
+# 	
+# 	function(m::residual_model)(data)
+# 		input = copy(data)
+# 		N_input = size(input, 1)
+# 		data = m.layers[1](data)
+# 		for n in 2:length(m.layers)
+# 			data = m.layers[n](cat(input[(1+N_input-size(data, 1)):end,:,:], data, dims=2))
+# 		end
+# 		data
+# 	end
+# end
+
+#amp_model = AmpModels.residual_model(1+n_ctrls, 32) |> g
+amp_model = AmpModels.model(1+n_ctrls, 32) |> g
+
+# =#
+
+#=
+@info "# Loading previously saved model and latent data"
+
+saved = BSON.load("../upsampling_model2.bson")
+
+latents = saved[:latents_cpu] |> g
+
+amp_model = saved[:amp_model_cpu] |> g
+=#
+
+
+offset = 48000 - size(amp_model(randn(Float32, 48000, 4, 1) |> g), 1)
+
+@info "Local variance models"
 # local_variance_filtords = [
 #     filtord(
 #         0.5*minimum(control_frequencies[n]),
@@ -228,46 +292,27 @@ bandpassed_latent_sizes = length.(latents) .- (bandpass_filter_ords .- 1)
 
 local_variance_filtords = [
     min(bandpassed_latent_sizes[n], Int(ceil(
-        (fs_fender / 2^ks[n]) * (1/(0.5*minimum(control_frequencies[n])))
+        (fs_fender / 2^ks[n]) * (1/minimum(control_frequencies[n]))
     )))
 
     for n in 1:n_ctrls
 ]
 
 local_variance_filter_coeffs = [
-    ones(local_variance_filtords[n]) ./ local_variance_filtords[n]
+    # ones(local_variance_filtords[n]) ./ local_variance_filtords[n]
+    gaussian(local_variance_filtords[n]/2, local_variance_filtords[n]/2, 1:local_variance_filtords[n])
+
 
     for n in 1:n_ctrls
 ]
 
+local_variance_filter_coeffs = [
+    local_variance_filter_coeffs[n] ./ sum(local_variance_filter_coeffs[n])
+    for n in 1:n_ctrls
+]
+
+
 local_variance_models = filtering_model.(local_variance_filter_coeffs) |> g
-
-@info "## Amp model"
-
-begin
-    amp_model_width=32
-    
-    amp_model = Flux.Chain(
-        Flux.Conv((1,), (1+n_ctrls)=>amp_model_width),
-        [Flux.Conv((3,), amp_model_width=>amp_model_width, Flux.tanh, dilation=d) for d in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
-        [Flux.Conv((3,), amp_model_width=>amp_model_width, Flux.tanh, dilation=d) for d in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
-        Flux.Conv((1,), amp_model_width=>1)
-    ) |> g
-end;
-# =#
-
-#=
-@info "# Loading previously saved model and latent data"
-
-saved = BSON.load("../upsampling_model2.bson")
-
-latents = saved[:latents_cpu] |> g
-
-amp_model = saved[:amp_model_cpu] |> g
-=#
-
-
-offset = 48000 - size(amp_model(randn(Float32, 48000, 4, 1) |> g), 1)
 
 
 @info "# Data splitting...."
@@ -297,12 +342,21 @@ end
 opt = Flux.setup(Flux.AdamW(0.001), [ latents, amp_model ])
 #opt = Flux.setup(Flux.AdamW(0.001, (0.9, 0.999), 0.001), [ latents, amp_model ])
 
+function format(n, p=8)
+    Format.format(n, precision=p)
+end
+
 function train()
     losses = []
     perm = Random.randperm(N_segments)
     # ProgressLogging.@progress for p in 1:N_segments
     for p in 1:N_segments
         n = perm[p] - 1
+
+        amp_loss = 0
+        variance_loss = 0
+        mean_loss = 0
+
         loss, grad = Flux.withgradient([latents, amp_model]) do (latents, amp_model)
             local ls = data_latent(latents, n)
             
@@ -316,23 +370,23 @@ function train()
             )
 
             local y = output[(offset+1+n*2^ks[1]):((n+1)*2^ks[1]), :, :]
-            local the_loss = Statistics.mean((amp_model(x) .- y).^2)
+
+            amp_loss = Statistics.mean((amp_model(x) .- y).^2)
 
             bp = [ latent_bandpass_models[n](latents[n]) for n in 1:n_ctrls ]
 
-            the_loss += 5f-1 * sum(Statistics.mean.([ (1f-2 .- local_variance_models[n](bp[n].^2)).^2 for n in 1:n_ctrls])) / N_segments
-
-            the_loss += 5f-1 * sum(Statistics.mean.([ local_variance_models[n](bp[n]).^2 for n in 1:n_ctrls])) / N_segments
+            variance_loss = 1f0 * sum(Statistics.mean.([ (1f0 .- local_variance_models[n](bp[n].^2)).^2 for n in 1:n_ctrls])) / N_segments
+            mean_loss = 1f0 * sum(Statistics.mean.([ local_variance_models[n](bp[n]).^2 for n in 1:n_ctrls])) / N_segments
 
             # the_loss += 1f-4 * Statistics.mean(l.^2)
             
-            the_loss
+            amp_loss # + variance_loss + mean_loss
         end
         # global the_grad = grad
         # Flux.update!(opt_latents, latents, grad[1][1])
         # Flux.update!(opt_amp_model, amp_model, grad[1][2])
         Flux.update!(opt, [ latents, amp_model], grad[1])
-        @info "loss: $(loss), step: $(p), segment: $(n)"
+        @info "loss: $(format(loss)), amp_loss: $(format(amp_loss)), mean_loss: $(format(mean_loss)), variance_loss: $(format(variance_loss)), step: $(p), segment: $(n)"
         push!(losses, loss)
     end
     @info "mean loss: $(Statistics.mean(losses))"
@@ -348,11 +402,11 @@ end;
 GC.gc(true); GC.gc(false)
 
 
-function save(latent_models, latents, amp_model)
+function save(filename, latent_models, latents, amp_model)
     latents_cpu = latents|> c
-    amp_model_cpu = amp_model |> c
-    latent_models_cpu = latent_models |> c
-    BSON.@save "../upsampling_model2.bson" latent_models_cpu latents_cpu amp_model_cpu
+    amp_model_state_cpu = Flux.state(amp_model |> c)
+    latent_models_state_cpu = Flux.state(latent_models |> c)
+    BSON.@save filename latent_models_state_cpu latents_cpu amp_model_state_cpu
     @info "Saved: $(Dates.now())"
 end
 

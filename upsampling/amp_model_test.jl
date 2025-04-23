@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.5
+# v0.20.6
 
 using Markdown
 using InteractiveUtils
@@ -17,19 +17,54 @@ macro bind(def, element)
 end
 
 # ╔═╡ d7aca48c-154d-11f0-34b2-390278649e9a
-import Flux, BSON, CUDA, cuDNN,WAV, PlutoUI, Statistics
+import Flux, BSON, CUDA, cuDNN,WAV, PlutoUI, Statistics, Revise, SimplePlutoInclude
+
+# ╔═╡ a3efc9a7-3688-434b-956e-2bfa854b3f60
+cuDNN.cudnnSetCallback(UInt(0), C_NULL, C_NULL)
+
+# ╔═╡ 13c4b468-7b4b-4ca7-8e54-fdf38932ba76
+dev = Flux.gpu
 
 # ╔═╡ 3b7dea62-476c-4237-b0b8-a0b1d6daf6cb
 saved = BSON.load("upsampling_model2.bson");
 
+# ╔═╡ 27b467ec-36ae-49ab-981c-949537c535c4
+# ╠═╡ disabled = true
+#=╠═╡
+saved2 = BSON.load("debug/residual.bson")
+  ╠═╡ =#
+
+# ╔═╡ 12764159-9a60-4b65-bf79-cb8dd1599d65
+# ╠═╡ disabled = true
+#=╠═╡
+SimplePlutoInclude.@plutoinclude("AmpModels.jl")
+  ╠═╡ =#
+
+# ╔═╡ 6ba7b058-f099-4342-bf2f-202241fed993
+# ╠═╡ disabled = true
+#=╠═╡
+amp_model_cpu = residual_model(4, 32)
+  ╠═╡ =#
+
+# ╔═╡ 06a4e0fe-53fa-43cc-8bb6-7ae80e67b18b
+#=╠═╡
+Flux.loadmodel!(amp_model_cpu, saved2[:amp_model_state_cpu])
+  ╠═╡ =#
+
+# ╔═╡ 73b446a7-49f3-4015-b14a-95e5f39ae98d
+# ╠═╡ disabled = true
+#=╠═╡
+saved2
+  ╠═╡ =#
+
 # ╔═╡ b392ea82-f697-46f5-a2e2-46ab105332cf
-amp_model = saved[:amp_model_cpu] |> Flux.gpu;
+amp_model = saved[:amp_model_cpu] |> dev;
 
 # ╔═╡ d016c3f8-f9e3-4587-ab46-50bc33197d6c
-latent_models = saved[:latent_models_cpu] |> Flux.gpu;
+latent_models = saved[:latent_models_cpu] |> dev;
 
 # ╔═╡ e4d38982-ad1c-4549-8072-635d53b4afdb
-latents = saved[:latents_cpu] |> Flux.gpu;
+latents = saved[:latents_cpu] |> dev;
 
 # ╔═╡ 90c07446-d27d-4bd2-848e-acbbb4b287e7
 N_latents = length(latents)
@@ -44,7 +79,7 @@ limits = [(minimum(d), maximum(d)) for d in upsampled_latents]
 test_input, fs_test = WAV.wavread("../data/test/Take1_Audio 1-1_short.wav");
 
 # ╔═╡ f79e5f32-5665-49c2-8c56-f44b8970201b
-padded_test_input = [zeros(10000); test_input];
+padded_test_input = Float32.([zeros(10000); test_input]);
 
 # ╔═╡ 5208225a-1ca9-4ec1-acc8-15458b976733
 @bind param1 PlutoUI.Slider(limits[1][1]:0.0001:limits[1][2], default=Statistics.mean(limits[1]))
@@ -60,14 +95,15 @@ padded_test_input = [zeros(10000); test_input];
 
 # ╔═╡ 925fbe15-f4b3-470a-a2dd-53ece6b9ac66
 test_output = amp_model(repeat(cat(
-	gain .* padded_test_input, 
-	[param1 param2 param3] .* ones(
+	Float32(gain) .* padded_test_input, 
+	Float32.([param1 param2 param3]) .* ones(
+		Float32,
 		size(padded_test_input, 1),
 		3, 
 		1
 	), 
 	dims=2
-), 1, 1, 1) |> Flux.gpu);
+), 1, 1, 1) |> dev);
 
 # ╔═╡ d0a30bb0-eba1-495d-bcfb-2bd5f68a971f
 begin
@@ -80,15 +116,12 @@ begin
 
 	# sleep(1)
 
-	# md"""$(PlutoUI.LocalResource("test_output.wav", :autoplay=>true))"""
+	md"""$(PlutoUI.LocalResource("../data/test/Take1_Audio 1-1_short.wav", :autoplay=>true))"""
 	md"""$(PlutoUI.LocalResource("test_output.wav"))"""
 end
 
-# ╔═╡ 5eeccf0b-960a-415b-bcd7-b949bd453ddb
-timing_data = randn(Float32, 48000, 4, 1);
-
-# ╔═╡ 49267842-4589-4e7f-ac18-6385c44ef01c
-for n in 1:10; saved[:amp_model_cpu](timing_data); end
+# ╔═╡ 9bffb72e-e553-462e-b111-7321418f6ad3
+md"""$(PlutoUI.LocalResource("../data/test/Take1_Audio 1-1_short.wav", :autoplay=>true))"""
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -97,6 +130,8 @@ BSON = "fbb218c0-5317-5bc6-957e-2ee96dd4b1f0"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+SimplePlutoInclude = "6f00a2c5-ea4a-46bf-9183-91b7b57a087f"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 WAV = "8149f6b0-98f6-5db9-b78f-408fbbb8ef88"
 cuDNN = "02a925ec-e4fe-4b08-9a7e-0d78e3d38ccd"
@@ -106,6 +141,8 @@ BSON = "~0.3.9"
 CUDA = "~5.7.1"
 Flux = "~0.16.3"
 PlutoUI = "~0.7.23"
+Revise = "~3.7.3"
+SimplePlutoInclude = "~0.2.0"
 WAV = "~1.2.0"
 cuDNN = "~1.4.2"
 """
@@ -116,7 +153,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.4"
 manifest_format = "2.0"
-project_hash = "c4226012db978f60b80a585aa2759bc3b2810b66"
+project_hash = "d8d89472c1c87f36fa65e1b1d47d051455065851"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -169,12 +206,6 @@ weakdeps = ["SparseArrays", "StaticArrays"]
     [deps.Adapt.extensions]
     AdaptSparseArraysExt = "SparseArrays"
     AdaptStaticArraysExt = "StaticArrays"
-
-[[deps.AliasTables]]
-deps = ["PtrArrays", "Random"]
-git-tree-sha1 = "9876e1e164b144ca45e9e3198d0b689cadfed9ff"
-uuid = "66dad0bd-aa9a-41b7-9441-69ab47430ed8"
-version = "1.1.3"
 
 [[deps.ArgCheck]]
 git-tree-sha1 = "f9e9a66c9b7be1ad7372bbd9b062d9230c30c5ce"
@@ -306,17 +337,21 @@ weakdeps = ["SparseArrays"]
     [deps.ChainRulesCore.extensions]
     ChainRulesCoreSparseArraysExt = "SparseArrays"
 
+[[deps.CodeTracking]]
+deps = ["InteractiveUtils", "UUIDs"]
+git-tree-sha1 = "062c5e1a5bf6ada13db96a4ae4749a4c2234f521"
+uuid = "da1fd8a2-8d9e-5ec2-8556-3022fb5608a2"
+version = "1.3.9"
+
 [[deps.ColorTypes]]
 deps = ["FixedPointNumbers", "Random"]
 git-tree-sha1 = "67e11ee83a43eb71ddc950302c53bf33f0690dfe"
 uuid = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
 version = "0.12.1"
+weakdeps = ["StyledStrings"]
 
     [deps.ColorTypes.extensions]
     StyledStringsExt = "StyledStrings"
-
-    [deps.ColorTypes.weakdeps]
-    StyledStrings = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 
 [[deps.Colors]]
 deps = ["ColorTypes", "FixedPointNumbers", "Reexport"]
@@ -664,6 +699,12 @@ git-tree-sha1 = "31e996f0a15c7b280ba9f76636b3ff9e2ae58c9a"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 version = "0.21.4"
 
+[[deps.JuliaInterpreter]]
+deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
+git-tree-sha1 = "872cd273cb995ed873c58f196659e32f11f31543"
+uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
+version = "0.9.44"
+
 [[deps.JuliaNVTXCallbacks_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "af433a10f3942e882d3c671aacb203e006a5808f"
@@ -772,6 +813,12 @@ version = "0.3.29"
 [[deps.Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 version = "1.11.0"
+
+[[deps.LoweredCodeUtils]]
+deps = ["JuliaInterpreter"]
+git-tree-sha1 = "688d6d9e098109051ae33d126fcfc88c4ce4a021"
+uuid = "6f1432cf-f94c-5a45-995e-cdbf5db27b0b"
+version = "3.1.0"
 
 [[deps.MLCore]]
 deps = ["DataAPI", "SimpleTraits", "Tables"]
@@ -968,20 +1015,18 @@ version = "1.8.0"
 
 [[deps.Parsers]]
 deps = ["Dates", "PrecompileTools", "UUIDs"]
-git-tree-sha1 = "8489905bcdbcfac64d1daa51ca07c0d8f0283821"
+git-tree-sha1 = "44f6c1f38f77cafef9450ff93946c53bd9ca16ff"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "2.8.1"
+version = "2.8.2"
 
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "Random", "SHA", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 version = "1.11.0"
+weakdeps = ["REPL"]
 
     [deps.Pkg.extensions]
     REPLExt = "REPL"
-
-    [deps.Pkg.weakdeps]
-    REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[deps.PlutoUI]]
 deps = ["AbstractPlutoDingetjes", "Base64", "Dates", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "Markdown", "Random", "Reexport", "UUIDs"]
@@ -1029,10 +1074,10 @@ git-tree-sha1 = "80d919dee55b9c50e8d9e2da5eeafff3fe58b539"
 uuid = "33c8b6b6-d38a-422a-b730-caa89a2f386c"
 version = "0.1.4"
 
-[[deps.PtrArrays]]
-git-tree-sha1 = "1d36ef11a9aaf1e8b74dacc6a731dd1de8fd493d"
-uuid = "43287f4e-b6f4-7ad1-bb20-aadabca52c3d"
-version = "1.3.0"
+[[deps.REPL]]
+deps = ["InteractiveUtils", "Markdown", "Sockets", "StyledStrings", "Unicode"]
+uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+version = "1.11.0"
 
 [[deps.Random]]
 deps = ["SHA"]
@@ -1067,6 +1112,16 @@ deps = ["UUIDs"]
 git-tree-sha1 = "62389eeff14780bfe55195b7204c0d8738436d64"
 uuid = "ae029012-a4dd-5104-9daa-d747884805df"
 version = "1.3.1"
+
+[[deps.Revise]]
+deps = ["CodeTracking", "FileWatching", "JuliaInterpreter", "LibGit2", "LoweredCodeUtils", "OrderedCollections", "REPL", "Requires", "UUIDs", "Unicode"]
+git-tree-sha1 = "5cf59106f9b47014c58c5053a1ce09c0a2e0333c"
+uuid = "295af30f-e4ad-537b-8983-00126c2a3abe"
+version = "3.7.3"
+weakdeps = ["Distributed"]
+
+    [deps.Revise.extensions]
+    DistributedExt = "Distributed"
 
 [[deps.SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
@@ -1105,6 +1160,12 @@ git-tree-sha1 = "7f534ad62ab2bd48591bdeac81994ea8c445e4a5"
 uuid = "605ecd9f-84a6-4c9e-81e2-4798472b76a3"
 version = "0.1.0"
 
+[[deps.SimplePlutoInclude]]
+deps = ["Dates"]
+git-tree-sha1 = "a98dee6bdc63f648d92b28348dcb9b59c2881fbf"
+uuid = "6f00a2c5-ea4a-46bf-9183-91b7b57a087f"
+version = "0.2.0"
+
 [[deps.SimpleTraits]]
 deps = ["InteractiveUtils", "MacroTools"]
 git-tree-sha1 = "5d7e3f4e11935503d3ecaf7186eac40602e7d231"
@@ -1134,9 +1195,9 @@ version = "0.1.2"
 
 [[deps.SpecialFunctions]]
 deps = ["IrrationalConstants", "LogExpFunctions", "OpenLibm_jll", "OpenSpecFun_jll"]
-git-tree-sha1 = "64cca0c26b4f31ba18f13f6c12af7c85f478cfde"
+git-tree-sha1 = "41852b8679f78c8d8961eeadc8f62cef861a52e3"
 uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
-version = "2.5.0"
+version = "2.5.1"
 weakdeps = ["ChainRulesCore"]
 
     [deps.SpecialFunctions.extensions]
@@ -1181,10 +1242,10 @@ uuid = "82ae8749-77ed-4fe6-ae5f-f523153014b0"
 version = "1.7.0"
 
 [[deps.StatsBase]]
-deps = ["AliasTables", "DataAPI", "DataStructures", "LinearAlgebra", "LogExpFunctions", "Missings", "Printf", "Random", "SortingAlgorithms", "SparseArrays", "Statistics", "StatsAPI"]
-git-tree-sha1 = "29321314c920c26684834965ec2ce0dacc9cf8e5"
+deps = ["DataAPI", "DataStructures", "LinearAlgebra", "LogExpFunctions", "Missings", "Printf", "Random", "SortingAlgorithms", "SparseArrays", "Statistics", "StatsAPI"]
+git-tree-sha1 = "d1bf48bfcc554a3761a133fe3a9bb01488e06916"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
-version = "0.34.4"
+version = "0.33.21"
 
 [[deps.StringManipulation]]
 deps = ["PrecompileTools"]
@@ -1205,6 +1266,10 @@ weakdeps = ["Adapt", "GPUArraysCore", "KernelAbstractions", "LinearAlgebra", "Sp
     StructArraysLinearAlgebraExt = "LinearAlgebra"
     StructArraysSparseArraysExt = "SparseArrays"
     StructArraysStaticArraysExt = "StaticArrays"
+
+[[deps.StyledStrings]]
+uuid = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
+version = "1.11.0"
 
 [[deps.SuiteSparse]]
 deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
@@ -1364,7 +1429,14 @@ version = "17.4.0+2"
 
 # ╔═╡ Cell order:
 # ╠═d7aca48c-154d-11f0-34b2-390278649e9a
+# ╠═a3efc9a7-3688-434b-956e-2bfa854b3f60
+# ╠═13c4b468-7b4b-4ca7-8e54-fdf38932ba76
 # ╠═3b7dea62-476c-4237-b0b8-a0b1d6daf6cb
+# ╠═27b467ec-36ae-49ab-981c-949537c535c4
+# ╠═12764159-9a60-4b65-bf79-cb8dd1599d65
+# ╠═6ba7b058-f099-4342-bf2f-202241fed993
+# ╠═06a4e0fe-53fa-43cc-8bb6-7ae80e67b18b
+# ╠═73b446a7-49f3-4015-b14a-95e5f39ae98d
 # ╠═b392ea82-f697-46f5-a2e2-46ab105332cf
 # ╠═d016c3f8-f9e3-4587-ab46-50bc33197d6c
 # ╠═e4d38982-ad1c-4549-8072-635d53b4afdb
@@ -1379,7 +1451,6 @@ version = "17.4.0+2"
 # ╠═61f68ce3-788d-4d0d-9b20-613c9b24e4a1
 # ╠═925fbe15-f4b3-470a-a2dd-53ece6b9ac66
 # ╠═d0a30bb0-eba1-495d-bcfb-2bd5f68a971f
-# ╠═5eeccf0b-960a-415b-bcd7-b949bd453ddb
-# ╠═49267842-4589-4e7f-ac18-6385c44ef01c
+# ╠═9bffb72e-e553-462e-b111-7321418f6ad3
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
