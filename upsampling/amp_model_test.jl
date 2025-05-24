@@ -26,7 +26,7 @@ cuDNN.cudnnSetCallback(UInt(0), C_NULL, C_NULL)
 dev = Flux.gpu
 
 # ╔═╡ 3b7dea62-476c-4237-b0b8-a0b1d6daf6cb
-saved = BSON.load("upsampling_model2.bson");
+saved = BSON.load("debug/model.bson");
 
 # ╔═╡ 27b467ec-36ae-49ab-981c-949537c535c4
 # ╠═╡ disabled = true
@@ -35,21 +35,13 @@ saved2 = BSON.load("debug/residual.bson")
   ╠═╡ =#
 
 # ╔═╡ 12764159-9a60-4b65-bf79-cb8dd1599d65
-# ╠═╡ disabled = true
-#=╠═╡
 SimplePlutoInclude.@plutoinclude("AmpModels.jl")
-  ╠═╡ =#
 
 # ╔═╡ 6ba7b058-f099-4342-bf2f-202241fed993
-# ╠═╡ disabled = true
-#=╠═╡
-amp_model_cpu = residual_model(4, 32)
-  ╠═╡ =#
+amp_model_cpu = model(4, 32)
 
 # ╔═╡ 06a4e0fe-53fa-43cc-8bb6-7ae80e67b18b
-#=╠═╡
-Flux.loadmodel!(amp_model_cpu, saved2[:amp_model_state_cpu])
-  ╠═╡ =#
+Flux.loadmodel!(amp_model_cpu, saved[:amp_model_state_cpu])
 
 # ╔═╡ 73b446a7-49f3-4015-b14a-95e5f39ae98d
 # ╠═╡ disabled = true
@@ -58,10 +50,13 @@ saved2
   ╠═╡ =#
 
 # ╔═╡ b392ea82-f697-46f5-a2e2-46ab105332cf
-amp_model = saved[:amp_model_cpu] |> dev;
+amp_model = amp_model_cpu |> dev;
 
 # ╔═╡ d016c3f8-f9e3-4587-ab46-50bc33197d6c
+# ╠═╡ disabled = true
+#=╠═╡
 latent_models = saved[:latent_models_cpu] |> dev;
+  ╠═╡ =#
 
 # ╔═╡ e4d38982-ad1c-4549-8072-635d53b4afdb
 latents = saved[:latents_cpu] |> dev;
@@ -70,10 +65,9 @@ latents = saved[:latents_cpu] |> dev;
 N_latents = length(latents)
 
 # ╔═╡ f2bcb67c-ef5d-4415-94fa-5f74fbd6a3af
+#=╠═╡
 upsampled_latents = [latent_models[n](latents[n]) for n in 1:N_latents]
-
-# ╔═╡ d4d9e715-f474-415d-9ed5-2510c6808f51
-limits = [(minimum(d), maximum(d)) for d in upsampled_latents]
+  ╠═╡ =#
 
 # ╔═╡ 332d529b-a4a3-4308-8dca-bde16a40ca8f
 test_input, fs_test = WAV.wavread("../data/test/Take1_Audio 1-1_short.wav");
@@ -116,12 +110,19 @@ begin
 
 	# sleep(1)
 
-	md"""$(PlutoUI.LocalResource("../data/test/Take1_Audio 1-1_short.wav", :autoplay=>true))"""
 	md"""$(PlutoUI.LocalResource("test_output.wav"))"""
 end
 
 # ╔═╡ 9bffb72e-e553-462e-b111-7321418f6ad3
 md"""$(PlutoUI.LocalResource("../data/test/Take1_Audio 1-1_short.wav", :autoplay=>true))"""
+
+# ╔═╡ b2fc0003-821e-4b8a-9591-a5b57a8ec409
+limits = Tuple{Float32, Float32}[(-0.2557498, 0.09255184), (-0.2502401, 0.22852662), (-0.28490403, 0.37349898)]
+
+# ╔═╡ d4d9e715-f474-415d-9ed5-2510c6808f51
+#=╠═╡
+limits = [(minimum(d), maximum(d)) for d in upsampled_latents]
+  ╠═╡ =#
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1441,6 +1442,7 @@ version = "17.4.0+2"
 # ╠═d016c3f8-f9e3-4587-ab46-50bc33197d6c
 # ╠═e4d38982-ad1c-4549-8072-635d53b4afdb
 # ╠═90c07446-d27d-4bd2-848e-acbbb4b287e7
+# ╠═b2fc0003-821e-4b8a-9591-a5b57a8ec409
 # ╠═f2bcb67c-ef5d-4415-94fa-5f74fbd6a3af
 # ╠═d4d9e715-f474-415d-9ed5-2510c6808f51
 # ╠═332d529b-a4a3-4308-8dca-bde16a40ca8f

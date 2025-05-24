@@ -28,12 +28,19 @@ module AmpModels
     data
   end
 
-  function model(n_channels, amp_model_width)
+  function model(n_channels, amp_model_widths)
     Flux.Chain(
-        Flux.Conv((1,), n_channels=>amp_model_width),
-            [ Flux.Conv((3,), (amp_model_width)=>amp_model_width, Flux.tanh, dilation=d)  for d in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
-            [Flux.Conv((3,), (amp_model_width)=>amp_model_width, Flux.tanh, dilation=d) for d in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
-            Flux.Conv((1,), (amp_model_width)=>1)
+        Flux.Conv((1,), n_channels=>amp_model_widths[1]),
+        [ 
+            Flux.Chain(
+                Flux.Conv((3,), amp_model_widths[1]=>amp_model_widths[1], Flux.tanh, dilation=d),
+                Flux.Conv((1,), amp_model_widths[1]=>amp_model_widths[1])
+            )  
+            for d in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]
+        ]...,
+        Flux.Conv((1,), amp_model_widths[1]=>amp_model_widths[2]),
+        [Flux.Conv((3,), amp_model_widths[2]=>amp_model_widths[2], Flux.tanh, dilation=d) for d in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512]]...,
+        Flux.Conv((1,), amp_model_widths[2]=>1)
      
     )
   end

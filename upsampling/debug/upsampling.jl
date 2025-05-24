@@ -251,7 +251,7 @@ include("../AmpModels.jl")
 # end
 
 #amp_model = AmpModels.residual_model(1+n_ctrls, 32) |> g
-amp_model = AmpModels.model(1+n_ctrls, 32) |> g
+amp_model = AmpModels.model(1+n_ctrls, [16, 8]) |> g
 
 # =#
 
@@ -391,7 +391,7 @@ function train()
     end
     @info "mean loss: $(Statistics.mean(losses))"
     the_latents = [ latent_models[n](latents[n]) for n in 1:n_ctrls ]
-    limits = [ (minimum(the_latents[n]), maximum(the_latents[n])) for n in 1:n_ctrls ]
+    global limits = [ (minimum(the_latents[n]), maximum(the_latents[n])) for n in 1:n_ctrls ]
     @info "limits: $(limits)"
     Images.save("latents.png", cat([plot(the_latents[n][1:10:end,1,1]|>c, width=6000) for n in 1:3]..., dims=1))
 end;
