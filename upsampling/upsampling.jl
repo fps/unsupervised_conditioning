@@ -1,11 +1,17 @@
 ### A Pluto.jl notebook ###
-# v0.20.5
+# v0.20.8
 
 using Markdown
 using InteractiveUtils
 
 # ╔═╡ 39571f62-0c13-11f0-2030-07b74f86187d
-import Flux, CUDA, cuDNN, DSP, Statistics,ProgressLogging,Images,BSON, Dates, Random
+import Flux, CUDA, cuDNN, DSP, Statistics,ProgressLogging,Images,BSON, Dates, Random, PlutoUI
+
+# ╔═╡ 80edb9b9-f00e-4b2f-8ceb-3392df726e56
+PlutoUI.TableOfContents()
+
+# ╔═╡ 9416bb3d-0e51-45cb-9a4b-0e8f6500c2b6
+cuDNN.cudnnSetCallback(UInt(0), C_NULL, C_NULL)
 
 # ╔═╡ 30ff827c-107d-48f2-8a75-27011a914d01
 c = Flux.cpu
@@ -283,7 +289,10 @@ lowpass_filter_coeffs = DSP.Filters.digitalfilter(
 md"# Loading previously saved data"
 
 # ╔═╡ f0a7460d-7f20-4ddb-9996-9975d4dcd9c0
+# ╠═╡ disabled = true
+#=╠═╡
 saved = BSON.load("upsampling_model.bson")
+  ╠═╡ =#
 
 # ╔═╡ e0c9c3de-ed58-4235-9e85-5cb53c0055fc
 md"# Latent models and parameters"
@@ -479,9 +488,6 @@ GC.gc(true); GC.gc(false)
 
 # ╔═╡ d159ba80-d27f-4ab1-b021-1d5ea42f1bf3
 md"# Test"
-
-# ╔═╡ 708f6af1-8130-459b-bd2b-7d7fbcd4fb2f
-import PlutoUI
 
 # ╔═╡ 44a5287a-b2a0-4fe9-bf2f-c75a1ed5bc22
 md"""$(PlutoUI.LocalResource("../data/test/Take1_Audio 1-1_short.wav", :autoplay=>true))"""
@@ -2566,6 +2572,8 @@ version = "17.4.0+2"
 
 # ╔═╡ Cell order:
 # ╠═39571f62-0c13-11f0-2030-07b74f86187d
+# ╠═80edb9b9-f00e-4b2f-8ceb-3392df726e56
+# ╠═9416bb3d-0e51-45cb-9a4b-0e8f6500c2b6
 # ╠═30ff827c-107d-48f2-8a75-27011a914d01
 # ╠═aeae157d-8f72-4fa2-a62b-e42ff82cc35c
 # ╟─308a59c1-06b7-431a-9abc-1476694a0508
@@ -2644,8 +2652,7 @@ version = "17.4.0+2"
 # ╠═baa548c0-e8ab-435d-b8d9-42cc3e34c32f
 # ╠═af591f5a-0904-41a8-9557-4228b9cc007b
 # ╟─d159ba80-d27f-4ab1-b021-1d5ea42f1bf3
-# ╠═708f6af1-8130-459b-bd2b-7d7fbcd4fb2f
-# ╟─44a5287a-b2a0-4fe9-bf2f-c75a1ed5bc22
+# ╠═44a5287a-b2a0-4fe9-bf2f-c75a1ed5bc22
 # ╠═37a476ce-d3fd-4dcf-a763-ba1766ab9e68
 # ╠═8b23470c-3151-488c-856b-4da424f78458
 # ╠═25faf22f-48d7-4b63-903c-0917c9fbafe1
