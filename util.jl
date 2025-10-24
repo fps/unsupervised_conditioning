@@ -15,9 +15,9 @@ function i2r(x)
 end
 
 function eye(num_latent_variables)
-    I = zeros(num_latent_variables, num_latent_variables)
-    for n in 1:length(num_latent_variables)
-        I[n,n] = 1
+    I = zeros(Float32, num_latent_variables, num_latent_variables)
+    for n in 1:num_latent_variables
+        I[n,n] = 1f0
     end
     I
 end
