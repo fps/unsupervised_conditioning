@@ -51,6 +51,7 @@ for n in 1:150000
         l += 1f0 .* Statistics.mean(diff(latent, dims=1).^2)
 
         l += 1f0 .* Statistics.mean((I .- cov(latent)).^2)
+        # l += 1f0 .* (1f0 - Statistics.mean(latent.^2)).^2
 
         l
     end
