@@ -2,7 +2,7 @@
 
 julia_version = "1.11.7"
 manifest_format = "2.0"
-project_hash = "6f7f61e24a55ba929821ba64c32d494608db8c4f"
+project_hash = "3623344ab3b96356f576bcf24118ccf3f53b94eb"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -2069,6 +2069,12 @@ git-tree-sha1 = "be8eeac05ec97d379347584fa9fe2f5f76795bcb"
 uuid = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
 version = "0.9.5"
 
+[[deps.SingularSpectrumAnalysis]]
+deps = ["LinearAlgebra", "Random", "RecipesBase", "Requires", "Statistics", "TotalLeastSquares"]
+git-tree-sha1 = "7e5298c3ea95507588335936b732819845aaa2dc"
+uuid = "77f5812f-bd1f-5f6e-9b72-07b28d8bbbc3"
+version = "0.5.1"
+
 [[deps.Sixel]]
 deps = ["Dates", "FileIO", "ImageCore", "IndirectArrays", "OffsetArrays", "REPL", "libsixel_jll"]
 git-tree-sha1 = "0494aed9501e7fb65daba895fb7fd57cc38bc743"
@@ -2258,6 +2264,12 @@ deps = ["ColorTypes", "DataStructures", "DocStringExtensions", "FileIO", "FixedP
 git-tree-sha1 = "98b9352a24cb6a2066f9ababcc6802de9aed8ad8"
 uuid = "731e570b-9d59-4bfa-96dc-6df516fadf69"
 version = "0.11.6"
+
+[[deps.TotalLeastSquares]]
+deps = ["FillArrays", "LinearAlgebra", "Printf", "SparseArrays", "Statistics", "StatsBase"]
+git-tree-sha1 = "6a64caee260f2c712635a832298cf25430f582fc"
+uuid = "028f657a-7ace-5159-a694-8cfd97933b0c"
+version = "1.7.7"
 
 [[deps.Tracy]]
 deps = ["ExprTools", "LibTracyClient_jll", "Libdl"]

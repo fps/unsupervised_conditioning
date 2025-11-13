@@ -6,7 +6,7 @@ println("Activating package...")
 Pkg.activate(".")
 
 println("Importing packages...")
-import CUDA, Flux, WAV, Plots, DSP, Statistics, Random, ParameterSchedulers
+import CUDA, Flux, WAV, Plots, DSP, Statistics, Random, ParameterSchedulers, MultivariateStats
 
 dev = Flux.gpu
 cpu = Flux.cpu
@@ -18,15 +18,24 @@ include("cat2.jl")
 
 println("Generating synthetic data...")
 x, y, fs, sigmas, controls, t = synthetic_data_3controls1()
+x_std = sqrt(Statistics.var(x))
+y_std = sqrt(Statistics.var(y))
+
+x ./= x_std
+y ./= y_std
+
+println("x_std: $(x_std), y_std: $(y_std)")
 
 # Random.seed!(2)
 
 x_dev = x |> dev
 y_dev = repeat(y, 1, 1, 1) |> dev
 
-
 # Validation data
 x2, y2, fs2, sigmas2, controls2, t2 = synthetic_data_3controls2()
+
+x2 ./= x_std
+y2 ./= y_std
 
 # Random.seed!(2)
 
@@ -36,6 +45,8 @@ y2_dev = repeat(y2, 1, 1, 1) |> dev
 # Validation data
 x3, y3, fs3, sigmas3, controls3, t3 = synthetic_data_3controls1()
 
+x3 ./= x_std
+y3 ./= y_std
 # Random.seed!(2)
 
 x3_dev = x3 |> dev
@@ -76,8 +87,8 @@ m_latent_up = Flux.ConvTranspose(repeat(Float32.(DSP.Windows.hanning(480)), 1, 1
 # #=
 
 stages = 8
-taps = 15
-cutoff = 0.4
+taps = 25
+cutoff = 0.25
 
 m_latent_down = downsampler(stages, taps, num_latent, cutoff) |> dev
 m_latent_up = upsampler(stages, taps, num_latent, cutoff) |> dev
@@ -113,8 +124,8 @@ m_decoder = Flux.Chain(
 ) |> dev
 
 offset_encoder = 48000 - size(randn(Float32, 48000, 2, 1) |> dev |> m_encoder, 1)
-offset_latent = 48000 - size(randn(Float32, 48000, 3, 1) |> dev |> m_latent_down |> m_latent_up, 1)
-offset_decoder = 48000 - size(randn(Float32, 48000, 4, 1) |> dev |> m_decoder, 1)
+offset_latent = 48000 - size(randn(Float32, 48000, num_latent, 1) |> dev |> m_latent_down |> m_latent_up, 1)
+offset_decoder = 48000 - size(randn(Float32, 48000, 1+num_latent, 1) |> dev |> m_decoder, 1)
 
 #=
 offset_test_data = randn(Float32, 48000, 2, 1) |> dev
@@ -179,6 +190,8 @@ function loss(m_encoder, m_decoder, x, y, x2, y2)
 
     l_recon = Flux.mse(decoded, y2[(1+N4+offset_decoder):(N4+offset_decoder+N_decoded), :, :])
 
+    # l_recon = Flux.mse(decoded, y2[(1 + N_x - N_decoded):end])
+
     l += l_recon
     # l += l_recon
 
@@ -200,6 +213,9 @@ function loss(m_encoder, m_decoder, x, y, x2, y2)
 
     # Covariance term
     # l += 1f-0 * Statistics.mean((I .- Im .* cov(latent_upsampled)).^2)
+    # l += 1f2 * Statistics.mean((Im .* cov(latent_upsampled)).^2)
+
+    # l += 1f-1 * Statistics.mean((1f0 .- Statistics.mean(latent_upsampled.^2, dims=1)).^2)
 
     # Mean per latent term
     l += 1f-0 * Statistics.mean(Statistics.mean(latent_downsampled, dims=1).^2)
@@ -215,7 +231,11 @@ for n in 1:max_epochs
     losses, grads = Flux.withgradient([m_encoder, m_decoder]) do params
         m_encoder = params[1]
         m_decoder = params[2]
-        loss(m_encoder, m_decoder, x_dev, y_dev, x_dev, y_dev)
+
+        x = x_dev .+ 1f-2 .* dev(randn(Float32, size(x_dev)...))
+        y = y_dev .+ 1f-2 .* dev(randn(Float32, size(y_dev)...))
+
+        loss(m_encoder, m_decoder, x, y, x_dev, y_dev)
     end
 
     if losses[1] < loss_min
@@ -252,16 +272,21 @@ for n in 1:max_epochs
     push!(losses_val2, loss(m_encoder, m_decoder, x_dev, y_dev, x3_dev, y3_dev)[2])
 
     if n % 100 == 0
+        latent = m_encoder(cat(x_dev, y_dev, dims=2)) |> m_latent_down |> m_latent_up |> cpu
+
+        pca = MultivariateStats.fit(MultivariateStats.PCA, latent[:,:,1]')
+
         Plots.plot(
             Plots.plot((m_encoder(cat(x_dev, y_dev, dims=2)) |> m_latent_down |> m_latent_up |> Flux.cpu)[:,:,1]),
             Plots.plot((m_encoder(cat(x2_dev, y2_dev, dims=2)) |> m_latent_down |> m_latent_up |> Flux.cpu)[:,:,1]),
             # Plots.plot((m_encoder(cat(x_dev, y_dev, dims=2)) |> m_latent_down |> Flux.cpu)[:,:,1]),
             Plots.plot((lrs)),
+            Plots.plot((pca.proj' * latent[:,:,1]')'),
             Plots.plot(20 .* log10.(losses_train)),
             Plots.plot(20 .* log10.(losses_val1)),
             Plots.plot(20 .* log10.(losses_val2)),
-            layout=(6,1),
-            size=(1000, 1000)
+            layout=(7,1),
+            size=(1000, 1200)
         ) |> display
     end
     # CUDA.reclaim()

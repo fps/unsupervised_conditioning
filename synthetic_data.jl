@@ -1,5 +1,6 @@
 include("varying_noise.jl")
 import SVF
+import Statistics
 
 function synthetic_data3controls(controls, x, fs)
     states = [SVF.State(), SVF.State(), SVF.State()]
