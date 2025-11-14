@@ -53,7 +53,7 @@ x3_dev = repeat(x3, 1, 1, 1) |> dev
 y3_dev = repeat(y3, 1, 1, 1) |> dev
 
 
-Plots.default(dpi=300, linewidth=0.5, alpha=0.75, legend=:none, size=(1000,1200))
+Plots.default(dpi=300, linewidth=0.5, alpha=0.75, legend=:none, size=(1000,1800))
 
 Plots.plot(Plots.plot(t, x), Plots.plot(t,y), Plots.plot(controls), layout=(3,1)) |> display
 
@@ -67,7 +67,7 @@ num_latent = 3
 
 println("Setting up model...")
 
-max_shift = 10000
+max_shift = 100
 
 depth_encoder = 12
 depth_decoder = 5
@@ -80,9 +80,9 @@ activation = Flux.tanh
 
 m_encoder = Flux.Chain(
     Flux.Conv((1, ), 2=>channels_encoder),
-    [Flux.Chain(Flux.Conv((3,), channels_encoder=>channels_encoder, activation, dilation=2^k), Flux.Dropout(0.5)) for k in 0:(depth_encoder-1)]...,
+    [Flux.Chain(Flux.Conv((3,), channels_encoder=>channels_encoder, activation, dilation=2^k), Flux.Dropout(0.8^(k+1))) for k in 0:(depth_encoder-1)]...,
     # [Flux.Chain(Flux.Conv((3,), channels_encoder=>channels_encoder, activation, dilation=2^k), Flux.Dropout(0.5; dims=2)) for k in 0:(depth_encoder-1)]...,
-    [Flux.Conv((3,), channels_encoder=>channels_encoder, activation, dilation=2^k) for k in 0:(depth_encoder-1)]...,
+    # [Flux.Conv((3,), channels_encoder=>channels_encoder, activation, dilation=2^k) for k in 0:(depth_encoder-1)]...,
     Flux.Conv((1,), channels_encoder=>num_latent)
 ) |> dev
 

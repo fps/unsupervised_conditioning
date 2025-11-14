@@ -18,22 +18,45 @@ include("util.jl")
 include("half_band_filters.jl")
 
 println("Generating synthetic data...")
-x, y, fs, sigmas, controls, t = synthetic_data_3controls()
+x, y, fs, sigmas, controls, t = synthetic_data_3controls1()
 
+x_mean = Statistics.mean(x, dims=1)
+x_std = Statistics.std(x, dims=1)
+
+y_mean = Statistics.mean(y, dims=1)
+y_std = Statistics.std(y, dims=1)
+
+x .-= x_mean
+x ./= x_std
+
+y .-= y_mean
+y ./= y_std
+
+#=
 for n in 1:length(controls)
     controls[n] = collect(controls[n])
     controls[n] .-= Statistics.mean(controls[n])
 end
+=#
 
 x_dev = x |> dev
 y_dev = repeat(y, 1, 1, 1) |> dev
 
 x2, y2, fs2, sigmas2, controls2, t2 = synthetic_data_3controls2()
 
+x2 .-= x_mean
+x2 ./= x_std
+
+y2 .-= y_mean
+y2 ./= y_std
+
+
+#=
 for n in 1:length(controls2)
     controls2[n] = collect(controls2[n])
     controls2[n] .-= Statistics.mean(controls2[n])
 end
+=#
 
 x2_dev = x2 |> dev
 y2_dev = repeat(y2, 1, 1, 1) |> dev
@@ -115,8 +138,8 @@ for n in 1:50000
             linewidth=0.2
         # ) |> display
         =#
-        Plots.plot(log10.(losses), label="Training loss (log10)")
-        Plots.plot!(log10.(losses_val), label="Validation loss (log10)") |> display
+        Plots.plot(20. * log10.(losses), label="Training loss (dB)")
+        Plots.plot!(20 .* log10.(losses_val), label="Validation loss (dB)") |> display
     end
     # CUDA.reclaim()
 end
