@@ -38,7 +38,10 @@ x, x_fs = WAV.wavread("data/fender_blues_junior/varying_noise_20_min_seed_0.wav"
 
 x = Float32.(x)
 
+t = Float32.(0:(1/length(x)):(1-(1/length(x))))
+
 x = x[1:length(y)]
+t = t[1:length(y)]
 
 x_mean = Statistics.mean(x)
 x_std = Statistics.std(x)
@@ -46,44 +49,52 @@ x_std = Statistics.std(x)
 x .-= x_mean
 x ./= x_std
 
-t = Float32.(0:(1/length(x)):(1-(1/length(x))))
 
 println("Setting up latent")
 
 # latent = cat(t .- 0.5, fourier_basis(t, 6), dims=2)
-latent = Float32.(cat(t .- 0.5, exponential_fourier_basis(t, 7), dims=2))
+latent = Float32.(cat(t .- 0.5, exponential_fourier_basis(t, 12), dims=2))
+# latent = []
+
 # latent = t .- 0.5
 
 # latent = 0.5 .* t
 
 latent = repeat(Float32.(latent), 1, 1, 1)
 num_latent = size(latent, 2)
+# num_latent = 0
 
 println("Setting up model...")
 
-channels = 32
+additive(mx, x) = mx .+ Float32(1/3) .* x[(1+size(x,1)-size(mx,1)):end,:,:]
+
+#=
+channels = 24
 m_amp = Flux.Chain(
     Flux.Conv((1, ), (1+num_latent)=>channels),
-    # [Flux.SkipConnection(Flux.Conv((3,), channels=>channels, Flux.tanh, dilation=2^k), (mx, x) -> mx .+ 1f-0 .* x[(1+size(x,1)-size(mx,1)):end,:,:]) for k in 0:11]...,
-    [ Flux.SkipConnection(Flux.Chain([Flux.Conv((2,), channels=>channels, Flux.leakyrelu, dilation=2^k) for k in 0:8]...), (mx, x) -> mx .+ x[(1+size(x,1)-size(mx,1)):end,:,:]) for l in 1:6 ]...,
+    # [Flux.SkipConnection(Flux.Conv((3,), channels=>channels, Flux.tanh, dilation=2^k), (mx, x) -> mx .+ x[(1+size(x,1)-size(mx,1)):end,:,:]) for k in 0:11]...,
+    [ Flux.SkipConnection(Flux.Chain([Flux.Conv((max(3, 8-k),), channels=>channels, Flux.leakyrelu, groups=1, dilation=2^k) for k in 0:8]...), additive) for l in 1:4 ]...,
+		# [ Flux.SkipConnection(Flux.Conv((3,), channels=>channels, Flux.leakyrelu, dilation=2^k), additive) for k in 0:10 ]...,
+		# [ Flux.SkipConnection(Flux.Conv((3,), channels=>channels, Flux.leakyrelu, dilation=2^k), additive) for k in 0:10 ]...,
+    # [ Flux.SkipFlux.Chain([Flux.Conv((3,), channels=>channels, Flux.leakyrelu, dilation=2^k) for k in 0:11]..., Flux.BatchNorm(channels)), (mx, x) -> mx .+ x[(1+size(x,1)-size(mx,1)):end,:,:]) for l in 1:2 ]...,
     Flux.Conv((1,), channels=>1)
 ) |> dev
+=#
+
+m_amp = AmpModeling.NAM.Wavenet.Standard(1+num_latent, 1, 32, 16, false, false) |> dev
 
 offset = 48000 - size(m_amp(randn(Float32, 48000, 1+num_latent, 1)|>dev), 1)
-
-println("Setting up optimizer...")
-# opt = Flux.setup(Flux.AdamW(lambda=0.2), [latent, m_amp])
-opt = Flux.setup(Flux.Adam(2f-4), m_amp)
 
 losses = []
 losses_val = []
 
 chunksize = 2*offset
-batchsize=div(48000*2, chunksize)
+batchsize=div(48000*1, chunksize)
 
 println("offset: $offset, chunksize: $chunksize, batchsize: $batchsize")
 
 x_chunks, y_chunks, chunk_starts = chunks(cat(x, latent, dims=2), y, chunksize, offset)
+# x_chunks, y_chunks, chunk_starts = chunks(x, y, chunksize, offset)
 
 N_chunks = size(x_chunks, 3)
 N_val_chunks = div(N_chunks, 10)
@@ -102,6 +113,12 @@ y_val = y_chunks[:,:,1:N_val_chunks] |> dev
 x_chunks = x_chunks[:,:,(N_val_chunks+1):end]
 y_chunks = y_chunks[:,:,(N_val_chunks+1):end]
 
+lr = 1e-4 * sqrt(batchsize)
+println("Setting up optimizer: $(lr)...")
+# opt = Flux.setup(Flux.AdamW(lambda=0.2), [latent, m_amp])
+opt = Flux.setup(Flux.Adam(lr), m_amp)
+#opt = Flux.setup(Flux.Momentum(lr, m_amp)
+
 println("Training...")
 for n in 0:50000
 
@@ -109,7 +126,7 @@ for n in 0:50000
 
     data_loader = Flux.MLUtils.DataLoader((x_chunks, y_chunks), batchsize=batchsize, shuffle=true, parallel=true, partial=true)
 
-    for batch in ProgressBars.ProgressBar(data_loader, printing_delay=0.1)
+    for batch in ProgressBars.ProgressBar(data_loader, printing_delay=0.5)
         batch_dev = batch |> dev
 
         loss, grads = Flux.withgradient(m_amp) do m_amp
@@ -126,15 +143,33 @@ for n in 0:50000
     end
 
     push!(losses, Statistics.mean(losses_epoch))
-    push!(losses_val, Flux.mse(y_val, m_amp(x_val)))
+
+		losses_epoch_val = []
+
+    data_loader_val = Flux.MLUtils.DataLoader((x_val, y_val), batchsize=batchsize, shuffle=true, parallel=true, partial=true)
+
+    for batch in ProgressBars.ProgressBar(data_loader_val, printing_delay=0.5)
+        batch_dev = batch |> dev
+
+        loss = Flux.Losses.mse(batch_dev[2], m_amp(batch_dev[1]))
+
+        CUDA.unsafe_free!(batch_dev[1])
+        CUDA.unsafe_free!(batch_dev[2])
+
+        push!(losses_epoch_val, loss)
+
+        # println("n: $n, loss: $loss")
+    end
+
+    push!(losses_val, Statistics.mean(losses_epoch_val))
     # push!(losses_val, Flux.mse(y_dev[(start_index + offset):end_index, :, :], m_amp(cat(latent[start_index:end_index, :, :], x_dev[start_index:end_index, :, :], dims=2))))
       if n % 1 == 0
         Plots.plot(
             # Plots.plot(m_amp(cat(latent, x_dev, dims=2))[:,1,1] |> Flux.cpu, linewidth=0.1, label="Predicted"),
             # Plots.plot(y_dev[offset:end,1,1] |> Flux.cpu, linewidth=0.1, label="Original"),
             # Plots.plot(latent[:,:,1] |> cpu),
-            Plots.plot(log10.(losses), label="Training loss (log10)"),
-            Plots.plot(log10.(losses_val), label="Validation loss (log10)"),
+            Plots.plot(log10.(losses), title="Training loss (log10)"),
+            Plots.plot(log10.(losses_val), title="Validation loss (log10)"),
             # Plots.plot(m_amp(x_val[:,:,1:1])[:,1,1] |> cpu, label="Validation output"),
             # Plots.plot(y_val[:,1,1] |> cpu, label="Validation target"),
             # Plots.plot(m_amp(x_chunks[:,:,1:1] |> dev)[:,1,1] |> cpu, label="Training output"),

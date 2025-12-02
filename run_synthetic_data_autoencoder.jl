@@ -1,3 +1,5 @@
+ENV["JULIA_CUDA_HARD_MEMORY_LIMIT"] = "6GiB"
+
 import Pkg
 
 println("Activating package...")
@@ -79,15 +81,15 @@ for n in 1:50000
         m_encoder = params[1]
         m_decoder = params[2]
 
-        latent_smooth = m_encoder(y_dev) |> m_latent
+        latent = m_encoder(y_dev) |> m_latent
 
-        latent_and_input = cat(latent_smooth, x_dev[(ord+offset):end,:,:], dims=2)
+        latent_and_input = cat(latent, x_dev[(ord+offset):end,:,:], dims=2)
 
         l = Flux.mse(y_dev[ord+(2*offset):end, :, :], m_decoder(latent_and_input))
 
-        l += 1f-2 * Statistics.mean(latent_smooth.^2)
-        # l += 1f-3 * Statistics.mean((I .- cov(latent_smooth)).^2)
-        l += 1f-2 * Statistics.mean(Statistics.mean(latent_smooth, dims=1).^2)
+        l += 1f-2 * Statistics.mean(latent.^2)
+        # l += 1f-3 * Statistics.mean((I .- cov(latent)).^2)
+        l += 1f-2 * Statistics.mean(Statistics.mean(latent, dims=1).^2)
         l
     end
     println("n: $n, loss: $loss")

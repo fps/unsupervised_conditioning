@@ -8,7 +8,7 @@ Pkg.activate(".")
 println("Importing packages...")
 import CUDA, Flux, WAV, Plots, DSP, Statistics, Random, ParameterSchedulers
 
-import AmpModeling
+# import AmpModeling
 
 
 dev = Flux.gpu

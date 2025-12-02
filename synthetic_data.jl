@@ -40,14 +40,9 @@ function synthetic_data_3controls2(T=1, fs=48000)
         0.5 .+ 2f-1 .* sin.(2 * pi * f[3] .* t .+ -pi/8)
         ]
 
-    controls[1] = reverse(controls[1])
-
     y = synthetic_data3controls(controls, x, fs)
 
-    # sigmas = [ 20, 1, 0.1 ]
-    sigmas = (1 ./ f) ./ 5
-
-    x, y, fs, sigmas, controls, t
+    x, y, controls
 end
 
 
@@ -69,8 +64,5 @@ function synthetic_data_3controls1(T=1, fs=48000)
 
     y = synthetic_data3controls(controls, x, fs)
 
-    # sigmas = [ 20, 1, 0.1 ]
-    sigmas = (1 ./ f) ./ 5
-
-    x, y, fs, sigmas, controls, t
+    x, y, controls
 end
