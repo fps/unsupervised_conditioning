@@ -14,12 +14,12 @@ include("synthetic_data.jl")
 include("util.jl")
 
 println("Generating synthetic data...")
-x, y, fs, sigmas, controls, t = synthetic_data_3controls1()
+x, y, controls = synthetic_data_3controls1()
 
 x_dev = x |> dev
 y_dev = repeat(y, 1, 1, 1) |> dev
 
-Plots.plot(Plots.plot(t, x), Plots.plot(t,y), Plots.plot(controls), layout=(3,1), linewidth=0.1, fontsize=1) |> display
+Plots.plot(Plots.plot(x), Plots.plot(y), Plots.plot(controls), layout=(3,1), linewidth=0.1, fontsize=1) |> display
 
 println("Setting up latent")
 num_latent = 3

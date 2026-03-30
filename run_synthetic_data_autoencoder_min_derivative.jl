@@ -36,7 +36,7 @@ channels = 16
 
 m_encoder = Flux.Chain(
     Flux.Conv((1, ), 2=>channels),
-    [Flux.Conv((3,), channels=>channels, Flux.tanh, dilation=2^k) for k in 0:8]...,
+    [Flux.Conv((3,), channels=>channels, Flux.tanh, dilation=2^k) for k in 0:10]...,
         Flux.Conv((1,), channels=>num_latent)
 ) |> dev
 
@@ -50,22 +50,26 @@ offset_enc = 48000 - size(m_encoder(randn(Float32, 48000, 2, 1)|>dev), 1)
 offset_dec = 48000 - size(m_decoder(randn(Float32, 48000, 1+num_latent, 1)|>dev), 1)
 
 println("Setting up optimizer...")
-opt = Flux.setup(Flux.Adam(1f-4), [m_encoder, m_decoder])
+opt = Flux.setup(Flux.Adam(1f-3), [m_encoder, m_decoder])
 # opt = Flux.setup(Flux.AdamW(eta=2f-4, lambda=0.00001), [m_encoder, m_decoder])
 
 I = sqrt(1f-2) .* eye(num_latent)
 
 println("Training...")
 for n in 1:50000
+    # noise = 1f-1 .* randn(Float32, size(x_dev, 1)-offset_enc, num_latent, 1) |> dev
+    x_noise = 1f-1 .* randn(Float32, size(x_dev)...) |> dev
+    y_noise = 1f-1 .* randn(Float32, size(y_dev)...) |> dev
+
     loss, grads = Flux.withgradient([m_encoder, m_decoder]) do params
         m_encoder = params[1]
         m_decoder = params[2]
 
-        latent = m_encoder(cat(x_dev, y_dev, dims=2)[:,:,:])
+        latent = m_encoder(cat(x_dev .+ x_noise, y_dev .+ y_noise, dims=2)[:,:,:])
         # latent .+= 1f-2 .* dev(randn(Float32, size(latent)...))
         x_new = x_dev[(1+offset_enc):end,:,:]
         # x_with_noise = x_new .+ 1f-0 * dev(randn(Float32, size(x_new)...))
-        latent_and_input = cat(latent, x_new, dims=2)
+        latent_and_input = cat(latent #=.+ noise =#, x_new, dims=2)
 
         l = Flux.mse(y_dev[(1+offset_enc+offset_dec):end, :, :], m_decoder(latent_and_input))
 

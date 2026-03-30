@@ -17,7 +17,8 @@ include("half_band_filters.jl")
 include("cat2.jl")
 
 println("Generating synthetic data...")
-x, y, fs, sigmas, controls, t = synthetic_data_3controls1()
+fs = 48000
+x, y, controls = synthetic_data_3controls1()
 x_std = sqrt(Statistics.var(x))
 y_std = sqrt(Statistics.var(y))
 
@@ -37,7 +38,7 @@ x_dev = x |> dev
 y_dev = y |> dev
 
 # Validation data
-x2, y2, fs2, sigmas2, controls2, t2 = synthetic_data_3controls2()
+x2, y2, controls2 = synthetic_data_3controls2()
 
 x2 ./= x_std
 y2 ./= y_std
@@ -48,7 +49,7 @@ x2_dev = x2 |> dev
 y2_dev = y2 |> dev
 
 # Validation data
-x3, y3, fs3, sigmas3, controls3, t3 = synthetic_data_3controls1()
+x3, y3, controls3 = synthetic_data_3controls1()
 
 x3 ./= x_std
 y3 ./= y_std
@@ -60,7 +61,7 @@ y3_dev = y3 |> dev
 
 Plots.default(dpi=300, linewidth=0.5, alpha=0.75, legend=:none, size=(1000,1800))
 
-Plots.plot(Plots.plot(t, x[:,1,1]), Plots.plot(t,y[:,1,1]), Plots.plot(controls), layout=(3,1)) |> display
+Plots.plot(Plots.plot(x[:,1,1]), Plots.plot(y[:,1,1]), Plots.plot(controls), layout=(3,1)) |> display
 
 println("Designing lowpass filter...")
 ord = DSP.remezord(100/fs, 150/fs, 0.1, 0.001)

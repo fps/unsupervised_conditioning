@@ -1,10 +1,7 @@
 import DSP
 import Random
 
-function varying_noise(length=48000, swingin=1024, cutoff=10, order=8, fs=48000, seed = Nothing)
-    if (seed != Nothing)
-        Random.seed!(seed)
-    end
+function varying_noise(length=48000, swingin=48000, cutoff=10, order=8, fs=48000)
     f = DSP.Filters.digitalfilter(DSP.Filters.Lowpass(cutoff), DSP.Filters.Butterworth(order), fs=fs)
     x = 2 .* rand(length+swingin, 1) .- 1
     y = 2 .* rand(length+swingin, 1) .- 1
