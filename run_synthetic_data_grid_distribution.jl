@@ -30,18 +30,18 @@ if init
 
     @info "Initial latents"
     # #=
-    windowsize=128
+    windowsize=1024
 
     spec = Float32.(sqrt.(DSP.spectrogram(y, windowsize, windowsize-1, window=DSP.gaussian(windowsize, 0.1)).power))
 
     initial_latent = cat(
-        Flux.ConvTranspose(ones(Float32, 128, 1, 1))(sum(spec[1:3,:], dims=1)'[:,:,:])[:,1,1],
-        Flux.ConvTranspose(ones(Float32, 128, 1, 1))(sum(spec[5:20,:], dims=1)'[:,:,:])[:,1,1],
-        Flux.ConvTranspose(ones(Float32, 128, 1, 1))(sum(spec[30:end,:], dims=1)'[:,:,:])[:,1,1],
+        Flux.ConvTranspose(ones(Float32, windowsize, 1, 1))(sum(spec[1:10,:], dims=1)'[:,:,:])[:,1,1],
+        Flux.ConvTranspose(ones(Float32, windowsize, 1, 1))(sum(spec[40:100,:], dims=1)'[:,:,:])[:,1,1],
+        Flux.ConvTranspose(ones(Float32, windowsize, 1, 1))(sum(spec[200:end,:], dims=1)'[:,:,:])[:,1,1],
         dims=2
     )
 
-    initial_latent ./= Flux.ConvTranspose(ones(Float32, 128, 1, 1))(ones(Float32, fs-127, 1, 1))[:,1,1]
+    initial_latent ./= Flux.ConvTranspose(ones(Float32, windowsize, 1, 1))(ones(Float32, fs-(windowsize-1), 1, 1))[:,1,1]
 
     initial_latent .-= Statistics.mean(initial_latent, dims=1)
     initial_latent ./= Statistics.std(initial_latent, dims=1)
@@ -72,7 +72,11 @@ if init
     @info "Setting up model..."
     latent_coeff = [25f0, 25f0]; latent_coeff ./= (5f-1 * sum(latent_coeff))
 
-    m_latent = Flux.Chain([Flux.Chain(Flux.ConvTranspose(Float32.(repeat([1, 1], 1, 1, num_latent)), stride=2, groups=num_latent), Flux.Conv(Float32.(repeat(DSP.digitalfilter(DSP.Lowpass(0.25), DSP.FIRWindow(DSP.hamming(15))), 1, 1, num_latent)), groups=num_latent)) for n in 1:n_sub]) |> dev
+    m_latent = Flux.Chain([
+        Flux.Chain(
+            Flux.ConvTranspose(Float32.(repeat([1, 1], 1, 1, num_latent)), stride=2, groups=num_latent),
+            Flux.Conv(Float32.(repeat(DSP.digitalfilter(DSP.Lowpass(0.25), DSP.FIRWindow(DSP.hamming(15))), 1, 1, num_latent)), groups=num_latent))
+        for n in 1:n_sub]) |> dev
 
     latent_offset = div(size(m_latent(latent), 1) - 48000, 2)
 
