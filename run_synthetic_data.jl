@@ -89,7 +89,7 @@ while true
         l_mse = Flux.mse(y_dev[offset:end, :, :], params[2](cat(params[1], x_dev, dims=2)))
 
         # l += #= 10.0^k =# #= (1/n) =# 1f-5 * sum(latent_smooth.^2) / prod(size(latent_smooth))
-        # l += Flux.mse(latent_smooth[fixed_latent_indices, :, :], fixed_latent_values)
+        l += Flux.mse(latent_smooth[fixed_latent_indices, :, :], fixed_latent_values)
         # l += 1f-0 * Statistics.mean(Statistics.mean(latent_smooth, dims=1).^2)
         # l += 1f-0 * Statistics.mean(latent_smooth.^2)
         # l += 1f-0 * Statistics.mean((I .- cov(latent_smooth)).^2)

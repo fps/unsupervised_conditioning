@@ -12,6 +12,7 @@ if init
     Plots.default(size=(1024, 1280), linewidth=0.1, dpi=300)
 
     dev = Flux.gpu
+    cpu = Flux.cpu
 
     include("synthetic_data.jl")
     include("util.jl")
@@ -20,14 +21,33 @@ if init
     fs = 48000
 
     x, y, controls = synthetic_data_3controls1(1)
+
+    x .-= Statistics.mean(x)
+    x ./= Statistics.std(x)
+
+    y .-= Statistics.mean(y)
+    y ./= Statistics.std(y)
+
     x_dev = x |> dev
     y_dev = repeat(y, 1, 1, 1) |> dev
 
+    for n in 1:length(controls)
+        # @info "n: $n"
+        controls[n] = collect(controls[n])
+        controls[n] .-= Statistics.mean(controls[n])
+        controls[n] ./= maximum(abs.(controls[n]))
+    end
+
     Plots.plot(Plots.plot(x), Plots.plot(y), Plots.plot(controls), layout=(3,1)) |> display
 
+    println("Fixing some latents...")
+    fixed_latent_indices = Random.rand(1:length(x), 12)
+    fixed_latent_values = hcat(controls...)[fixed_latent_indices, :] |> dev
+    # fixed_latent_values .-= Statistics.mean(fixed_latent_values, dims=1)
+    # fixed_latent_values ./= Statistics.std(fixed_latent_values, dims=1)
 
     println("Setting up latent")
-    num_latent = 8
+    num_latent = 3
 
     n_sub = 8
 
@@ -45,7 +65,7 @@ if init
     channels = 16
     m_amp = Flux.Chain(
         Flux.Conv((1, ), (1+num_latent)=>channels),
-        [Flux.Conv((3,), channels=>channels, Flux.tanh, dilation=2^k) for k in 0:8]...,
+        [Flux.Conv((3,), channels=>channels, Flux.leakyrelu, dilation=2^k) for k in 0:8]...,
         Flux.Conv((1,), channels=>1)
     ) |> dev
 
@@ -72,12 +92,12 @@ if init
 end
 
 println("Training...")
-# for n in 1:150000
-n = 0
-while true
+for n in 1:150000
+# n = 0
+# while true
     global losses
     global val_losses
-    global n
+    # global  n
     global loss
 
     loss, grads = Flux.withgradient([latent, m_amp]) do (latent, m_amp, )
@@ -87,8 +107,11 @@ while true
             train_mask[offset:end,:,:] .* y_dev[offset:end, :, :],
             train_mask[offset:end,:,:] .* m_amp(cat(latent_smooth, x_dev, dims=2)))
 
+        l_mse += Flux.mse(latent_smooth[fixed_latent_indices, :, :], fixed_latent_values)
+        l_mse += Flux.mse(latent_smooth, min.(max.(latent_smooth, -1), 1))
+
         l_mean = 1f-0 * Statistics.mean(Statistics.mean(latent_smooth, dims=1).^2)
-        l_weight = 1f1 * Statistics.mean(latent_smooth.^2)
+        l_weight = 0f1 * Statistics.mean(latent_smooth.^2)
 
         l_diff = 0f0 .* Float32(fs) * Statistics.mean(diff_weights .* diff(latent_smooth, dims=1).^2)
 
