@@ -1,4 +1,4 @@
-if init
+if !@isdefined(init) || init
     ENV["JULIA_CUDA_HARD_MEMORY_LIMIT"] = "6GiB"
 
     import Pkg
@@ -9,6 +9,8 @@ if init
     println("Importing packages...")
     import CUDA, Flux, WAV, Plots, DSP, Statistics
 
+    Plots.GR.reset()
+    
     Plots.default(size=(1024, 1280), linewidth=0.1, dpi=300)
 
     dev = Flux.gpu
@@ -41,7 +43,7 @@ if init
     Plots.plot(Plots.plot(x), Plots.plot(y), Plots.plot(controls), layout=(3,1)) |> display
 
     println("Fixing some latents...")
-    fixed_latent_indices = Random.rand(1:length(x), 12)
+    fixed_latent_indices = Random.rand(1:length(x), 25)
     fixed_latent_values = hcat(controls...)[fixed_latent_indices, :] |> dev
     # fixed_latent_values .-= Statistics.mean(fixed_latent_values, dims=1)
     # fixed_latent_values ./= Statistics.std(fixed_latent_values, dims=1)
@@ -51,21 +53,26 @@ if init
 
     n_sub = 8
 
-    l_latent = Int(ceil((48000+12000) * (1/2)^n_sub))
+    l_latent = Int(ceil((48000+48000) * (1/2)^n_sub))
 
     latent = 1f-15 .* randn(Float32, l_latent, num_latent, 1) |> dev
 
     println("Setting up model...")
     latent_coeff = [25f0, 25f0]; latent_coeff ./= (5f-1 * sum(latent_coeff))
 
-    m_latent = Flux.Chain([Flux.Chain(Flux.ConvTranspose(Float32.(repeat([1, 1], 1, 1, num_latent)), stride=2, groups=num_latent), Flux.Conv(Float32.(repeat(DSP.digitalfilter(DSP.Lowpass(0.25), DSP.FIRWindow(DSP.hamming(15))), 1, 1, num_latent)), groups=num_latent)) for n in 1:n_sub]) |> dev
+    m_latent = Flux.Chain([
+        Flux.Chain(
+            Flux.ConvTranspose(Float32.(repeat([1, 1], 1, 1, num_latent)), stride=2, groups=num_latent),
+            Flux.Conv(Float32.(repeat(DSP.digitalfilter(DSP.Lowpass(0.5), DSP.FIRWindow(DSP.hamming(15))), 1, 1, num_latent)), groups=num_latent))
+        for n in 1:n_sub]) |> dev
 
     latent_offset = div(size(m_latent(latent), 1) - 48000, 2)
+    # latent_offset = size(m_latent(latent), 1) - 48000
 
     channels = 16
     m_amp = Flux.Chain(
         Flux.Conv((1, ), (1+num_latent)=>channels),
-        [Flux.Conv((3,), channels=>channels, Flux.leakyrelu, dilation=2^k) for k in 0:8]...,
+        [Flux.Conv((3,), channels=>channels, Flux.leakyrelu, dilation=2^k) for k in 0:7]...,
         Flux.Conv((1,), channels=>1)
     ) |> dev
 
@@ -102,6 +109,7 @@ for n in 1:150000
 
     loss, grads = Flux.withgradient([latent, m_amp]) do (latent, m_amp, )
         latent_smooth = m_latent(latent)[latent_offset:(latent_offset+48000-1),:,:]
+        # latent_smooth = m_latent(latent)[1:48000,:,:]
 
         l_mse = (length(train_mask) / sum(train_mask)) * Flux.mse(
             train_mask[offset:end,:,:] .* y_dev[offset:end, :, :],
@@ -110,7 +118,7 @@ for n in 1:150000
         l_mse += Flux.mse(latent_smooth[fixed_latent_indices, :, :], fixed_latent_values)
         l_mse += Flux.mse(latent_smooth, min.(max.(latent_smooth, -1), 1))
 
-        l_mean = 1f-0 * Statistics.mean(Statistics.mean(latent_smooth, dims=1).^2)
+        l_mean = 0f-0 * Statistics.mean(Statistics.mean(latent_smooth, dims=1).^2)
         l_weight = 0f1 * Statistics.mean(latent_smooth.^2)
 
         l_diff = 0f0 .* Float32(fs) * Statistics.mean(diff_weights .* diff(latent_smooth, dims=1).^2)
@@ -143,14 +151,15 @@ for n in 1:150000
     if n % 100 == 0
         Plots.plot(
             Plots.plot(y, label="y"),
-            Plots.plot(Flux.cpu(m_latent(latent)[latent_offset:(latent_offset+48000-1),:,1]), label="latent"),
+            Plots.plot(Flux.cpu(m_latent(latent)[:,:,1]), label="latent_smooth"),
+            Plots.plot(Flux.cpu(latent[:,:,1]), label="latent"),
             Plots.plot(controls, label="controls"),
             Plots.plot(log10.(losses), label="training loss"),
             Plots.plot(log10.(losses_mse), label="mse"),
             # Plots.plot(log10.(losses_diff)),
             # Plots.plot(log10.(losses_var)),
             Plots.plot(log10.(val_losses), label="validation loss"),
-            layout=(6,1)
+            layout=(7,1)
         ) |> display
 
         # println("losses: amp: $(Flux.mse(y_dev[offset:end, :, :], m_amp(cat(m_latent(latent), x_dev, dims=2)))), cov: $(1f-1 * sum((I .- cov(m_latent(latent))).^2))")

@@ -110,7 +110,12 @@ if init
     diff_weights = Float32.(0.1.^(0:(num_latent-1))') |> dev
 
     f2 = DSP.digitalfilter(DSP.Lowpass(100/48000), DSP.FIRWindow(DSP.hanning(10000)))
-
+    
+    function random_direction(D)
+        ret = randn(Float32, D)
+        ret ./= LinearAlgebra.norm(ret)
+    end
+    
     function sample_characteristic_function(samples, evaluation_points)
         (1/length(samples) * sum(exp.(-im .* evaluation_points' .* samples), dims=1))
     end
