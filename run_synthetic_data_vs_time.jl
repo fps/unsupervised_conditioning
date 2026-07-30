@@ -6,7 +6,7 @@ println("Activating package...")
 Pkg.activate(".")
 
 println("Importing packages...")
-import CUDA, Flux, WAV, Plots, DSP, Statistics, FFTW
+import CUDA, Flux, WAV, Plots, DSP, Statistics, FFTW, MultivariateStats
 
 Plots.default(dpi=300, linewidth=0.5, alpha=0.75, size=(1000, 1200))
 
@@ -54,9 +54,11 @@ println("Setting up latent")
 
 t = range(0, 1-(1/48000), 48000)
 # latent = t[:,:,:] .- 0.5 |> dev
-# f_latent = 50
-latent = cat(t[:,:,:], exponential_fourier_basis(t, 8)[:,:,:], dims=2) |> dev
-# latent = t .* cat(sin.(2 * pi * f_latent .* t), cos.(2 * pi * f_latent .* t), dims=2)[:,:,:] |> dev
+
+latent = cat(t[:,:,:], exponential_fourier_basis(t, 6)[:,:,:], dims=2) |> dev
+
+# f_latent = 150
+# latent = cat(t, sin.(2 * pi * f_latent .* t), cos.(2 * pi * f_latent .* t), dims=2)[:,:,:] |> dev
 # latent = 0.5 .* t
 
 num_latent = size(latent, 2)
@@ -104,7 +106,7 @@ for n in 1:50000
     # println("n: $n, loss: $loss")
     Flux.update!(opt, m_amp, grads[1])
     
-    if n % 100 == 0
+    if n % 500 == 0
         Plots.plot(
             Plots.plot(m_amp(cat(latent, x_dev, dims=2))[:,1,1] |> Flux.cpu, linewidth=0.1, label="Predicted"),
             Plots.plot(y_dev[offset:end,1,1] |> Flux.cpu, linewidth=0.1, label="Original"),
@@ -118,23 +120,34 @@ end
 
 @info "Feeding white noise samples and calculate spectrogram..."
 
-spectra_starts = 1:10:size(t,1)
+spectrum_hop = 80
 
-n_spectrum_samples = 50
+spectra_starts = 1:spectrum_hop:size(t,1)
+
+n_spectrum_samples = 100
+
+n_spectrum_bins = 64
 
 spectra = []
 
-for n in 1:10:size(t, 1)
+spectrum_input_sample = dev(randn(Float32, (2*n_spectrum_bins)+offset, 1, n_spectrum_samples))
+for n in spectra_starts
     @info "n: $n"
-    y_hat = m_amp(cat(repeat(latent[n:n, :, :], 2*offset, 1, n_spectrum_samples), dev(randn(Float32, 2*offset, 1, n_spectrum_samples)), dims=2))
+    y_hat = m_amp(cat(repeat(latent[n:n, :, :], (2*n_spectrum_bins)+offset, 1, n_spectrum_samples), spectrum_input_sample, dims=2))
     spectrum = Statistics.mean(cat([abs.(FFTW.fft(y_hat[:,1,n])) for n in 1:n_spectrum_samples]..., dims=2), dims=2)
     spectrum = spectrum[1:(div(size(spectrum, 1), 2)), :]
     push!(spectra, spectrum)
 end
 
-spectrogram = cat(spectra..., dims=2)
+spectrogram = cpu(cat(spectra..., dims=2))
 
-Plots.heatmap(cpu(log2.(spectrogram))) |> display
+Plots.heatmap(log10.(spectrogram)) |> display
 
+#=
+ica = MultivariateStats.fit(MultivariateStats.ICA, log10.(cpu(spectrogram)), 3)
+Plots.plot(MultivariateStats.predict(ica, log10.(cpu(spectrogram)))')
+=#
 
+pca = MultivariateStats.fit(MultivariateStats.PCA, log10.(cpu(spectrogram)), maxoutdim=3)
+Plots.plot(MultivariateStats.predict(pca, log10.(cpu(spectrogram)))')
 
