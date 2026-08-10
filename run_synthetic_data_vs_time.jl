@@ -37,17 +37,6 @@ y ./= y_std
 x_dev = x |> dev
 y_dev = repeat(y, 1, 1, 1) |> dev
 
-x2, y2, controls2 = synthetic_data_3controls1(5)
-
-x2 .-= x_mean
-x2 ./= x_std
-
-y2 .-= y_mean
-y2 ./= y_std
-
-x2_dev = x2 |> dev
-y2_dev = repeat(y2, 1, 1, 1) |> dev
-
 Plots.plot(Plots.plot(x), Plots.plot(y), Plots.plot(controls), layout=(3,1), linewidth=0.1, fontsize=1) |> display
 
 println("Setting up latent")
@@ -56,6 +45,9 @@ t = range(0, 1-(1/48000), 48000)
 # latent = t[:,:,:] .- 0.5 |> dev
 
 latent = cat(t[:,:,:], exponential_fourier_basis(t, 6)[:,:,:], dims=2) |> dev
+
+latent .-= Statistics.mean(latent, dims=1)
+latent ./= Statistics.std(latent, dims=1)
 
 # f_latent = 150
 # latent = cat(t, sin.(2 * pi * f_latent .* t), cos.(2 * pi * f_latent .* t), dims=2)[:,:,:] |> dev
@@ -144,10 +136,10 @@ spectrogram = cpu(cat(spectra..., dims=2))
 Plots.heatmap(log10.(spectrogram)) |> display
 
 #=
-ica = MultivariateStats.fit(MultivariateStats.ICA, log10.(cpu(spectrogram)), 3)
-Plots.plot(MultivariateStats.predict(ica, log10.(cpu(spectrogram)))')
+ica = MultivariateStats.fit(MultivariateStats.ICA, log10.(spectrogram), 3)
+Plots.plot(MultivariateStats.predict(ica, log10.(spectrogram))')
 =#
 
-pca = MultivariateStats.fit(MultivariateStats.PCA, log10.(cpu(spectrogram)), maxoutdim=3)
-Plots.plot(MultivariateStats.predict(pca, log10.(cpu(spectrogram)))')
+pca = MultivariateStats.fit(MultivariateStats.PCA, log10.(spectrogram), maxoutdim=3)
+Plots.plot(MultivariateStats.predict(pca, log10.(spectrogram))')
 

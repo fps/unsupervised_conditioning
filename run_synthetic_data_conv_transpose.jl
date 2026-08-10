@@ -7,7 +7,7 @@ if !@isdefined(init) || init
     Pkg.activate(".")
 
     println("Importing packages...")
-    import CUDA, Flux, WAV, Plots, DSP, Statistics
+    import CUDA, Flux, WAV, Plots, DSP, Statistics, FFTW
 
     Plots.GR.reset()
     
@@ -49,7 +49,7 @@ if !@isdefined(init) || init
     # fixed_latent_values ./= Statistics.std(fixed_latent_values, dims=1)
 
     println("Setting up latent")
-    num_latent = 3
+    num_latent = 8
 
     n_sub = 8
 
@@ -99,7 +99,7 @@ if !@isdefined(init) || init
 end
 
 println("Training...")
-for n in 1:150000
+for n in 1:20000
 # n = 0
 # while true
     global losses
@@ -115,8 +115,8 @@ for n in 1:150000
             train_mask[offset:end,:,:] .* y_dev[offset:end, :, :],
             train_mask[offset:end,:,:] .* m_amp(cat(latent_smooth, x_dev, dims=2)))
 
-        l_mse += Flux.mse(latent_smooth[fixed_latent_indices, :, :], fixed_latent_values)
-        l_mse += Flux.mse(latent_smooth, min.(max.(latent_smooth, -1), 1))
+        # l_mse += Flux.mse(latent_smooth[fixed_latent_indices, :, :], fixed_latent_values)
+        # l_mse += Flux.mse(latent_smooth, min.(max.(latent_smooth, -1), 1))
 
         l_mean = 0f-0 * Statistics.mean(Statistics.mean(latent_smooth, dims=1).^2)
         l_weight = 0f1 * Statistics.mean(latent_smooth.^2)
@@ -151,7 +151,7 @@ for n in 1:150000
     if n % 100 == 0
         Plots.plot(
             Plots.plot(y, label="y"),
-            Plots.plot(Flux.cpu(m_latent(latent)[:,:,1]), label="latent_smooth"),
+            Plots.plot(Flux.cpu(m_latent(latent)[latent_offset .+ (1:48000),:,1]), label="latent_smooth"),
             Plots.plot(Flux.cpu(latent[:,:,1]), label="latent"),
             Plots.plot(controls, label="controls"),
             Plots.plot(log10.(losses), label="training loss"),
@@ -167,3 +167,40 @@ for n in 1:150000
     end
     n += 1
 end
+
+@info "Gathering spectral data..."
+spectrum_hop = 80
+
+latent_smooth = m_latent(latent)[latent_offset .+ (1:48000),:,1]
+
+spectra_starts = 1:spectrum_hop:(48000 - ((2 * n_spectrum_bins) + offset + spectrum_hop))
+
+n_spectrum_samples = 256
+
+n_spectrum_bins = 64
+
+spectra = []
+
+
+for n in spectra_starts
+    @info "n: $n"
+    spectrum_input_sample = dev(randn(Float32, (2*n_spectrum_bins)+offset, 1, n_spectrum_samples))    # current_latent = repeat(latent_smooth[n:n, :, :], (2*n_spectrum_bins)+offset, 1, n_spectrum_samples)
+    current_latent = repeat(latent_smooth[n:(n+(2*n_spectrum_bins)+offset-1),:,:], 1, 1, n_spectrum_samples)
+    y_hat = m_amp(cat(current_latent, spectrum_input_sample, dims=2))
+    spectrum = Statistics.mean(cat([abs.(FFTW.fft(y_hat[:,1,n])) for n in 1:n_spectrum_samples]..., dims=2), dims=2)
+    spectrum = spectrum[1:(div(size(spectrum, 1), 2)), :]
+    push!(spectra, spectrum)
+end
+
+spectrogram = cpu(cat(spectra..., dims=2))
+
+Plots.heatmap(log10.(spectrogram)) |> display
+
+#=
+ica = MultivariateStats.fit(MultivariateStats.ICA, log10.(spectrogram), 3)
+Plots.plot(MultivariateStats.predict(ica, log10.(spectrogram))')
+=#
+
+pca = MultivariateStats.fit(MultivariateStats.PCA, log10.(spectrogram), maxoutdim=3)
+Plots.plot(MultivariateStats.predict(pca, log10.(spectrogram))', linewidth=1)
+
