@@ -11,6 +11,8 @@ input, input_fs = WAV.wavread("data/nam_input.wav")
 # input, input_fs = WAV.wavread("signal.wav")
 # input, input_fs = WAV.wavread("data/nam_input_spliced_noise.wav")
 
+input = input[1:(30*48000)]
+
 test_signal = 1f-2 .* randn(4 * m_amp_offset)
 
 @info "Splicing test signal..."
@@ -28,11 +30,48 @@ d_cabinet = filter(x -> LADSPA.label(x) == "CabinetIV", LADSPA.descriptors())[1]
 amp = LADSPA.instantiate(d_amp, samplerate)
 cabinet = LADSPA.instantiate(d_cabinet, samplerate)
 
+port_index(name) = LADSPA.port_index(d_amp, name)
+
+gain = port_index("gain")
+tonestack = port_index("tonestack")
+lowcut = port_index("lowcut")
+
+bass = port_index("bass")
+mid = port_index("mid")
+treble = port_index("treble")
+
 @info "Setting up buffers..."
 
 buffers_amp = LADSPA.prepare_buffers(d_amp, samplerate, length(input))
 
-t = (1:length(input)) ./ 48000
+@info "Setting up common controls..."
+
+buffers_amp[gain] .= 0.75
+buffers_amp[tonestack] .= 3
+buffers_amp[lowcut] .= 0.1
+
+@info "Setting up supervised controls..."
+
+# supervised_controls = [[0.0, 0.0, 0.0], [-1, 0, 0], [1, 0, 0], [0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1]]
+supervised_controls = [[i, j, k] for i in [-1,0,1] for j in [-1, 0, 1] for k in [-1, 0, 1]]
+
+supervised_chunk_size = 12 * m_amp_offset
+
+for n in ((1:length(supervised_controls)) .- 1)
+    buffers_amp[bass][(1 + (n * supervised_chunk_size)):((n+1) * supervised_chunk_size)] .= (supervised_controls[n+1][1] ./ 2) .+ 0.5
+    buffers_amp[mid][(1 + (n * supervised_chunk_size)):((n+1) * supervised_chunk_size)] .= (supervised_controls[n+1][2] ./ 2) .+ 0.5
+    buffers_amp[treble][(1 + (n * supervised_chunk_size)):((n+1) * supervised_chunk_size)] .= (supervised_controls[n+1][3] ./ 2) .+ 0.5
+end
+
+UnicodePlots.lineplot(buffers_amp[bass][1:(supervised_chunk_size*length(supervised_controls))], width=:auto, title="bass") |> display
+UnicodePlots.lineplot(buffers_amp[mid][1:(supervised_chunk_size*length(supervised_controls))], width=:auto, title="mid") |> display
+UnicodePlots.lineplot(buffers_amp[treble][1:(supervised_chunk_size*length(supervised_controls))], width=:auto, title="treble") |> display
+
+@info "Setting up unsupervised controls..."
+
+unsupervised_indices = (1 + supervised_chunk_size * length(supervised_controls)):length(input)
+
+t = (1:length(unsupervised_indices)) ./ samplerate
 
 f1 = 1 / t[end]
 p1 = 0.456
@@ -43,13 +82,9 @@ p2 = 2.9794
 f3 = 23 / t[end]
 p3 = 6.3445
 
-buffers_amp[LADSPA.port_index(d_amp, "gain")] .= 0.75
-buffers_amp[LADSPA.port_index(d_amp, "tonestack")] .= 3
-buffers_amp[LADSPA.port_index(d_amp, "lowcut")] .= 0.1
-
-buffers_amp[LADSPA.port_index(d_amp, "bass")] .= 0.5 .+ 0.5 .* sin.((2 * pi * f1) .* t .+ p1) 
-buffers_amp[LADSPA.port_index(d_amp, "treble")] .= 0.5 .+ 0.5 .* sin.((2 * pi * f2) .* t .+ 2) 
-buffers_amp[LADSPA.port_index(d_amp, "mid")] .= 0.5 .+ 0.5 .* sin.((2 * pi * f3) .* t .+ p3) 
+buffers_amp[bass][unsupervised_indices] .= 0.5 .+ 0.5 .* sin.((2 * pi * f1) .* t .+ p1) 
+buffers_amp[treble][unsupervised_indices] .= 0.5 .+ 0.5 .* sin.((2 * pi * f2) .* t .+ 2) 
+buffers_amp[mid][unsupervised_indices] .= 0.5 .+ 0.5 .* sin.((2 * pi * f3) .* t .+ p3) 
 
 buffers_amp[12] .= input
 
@@ -85,3 +120,5 @@ LADSPA.cleanup(amp)
 LADSPA.cleanup(cabinet)
 
 @info "Done."
+
+

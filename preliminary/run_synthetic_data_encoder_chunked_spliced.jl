@@ -141,6 +141,8 @@ similarity_weights = dev([1 1 1]')
 
 # STAHP
 
+batchsize = 2^7
+
 sigreg_test_points = dev(Float32.(collect(range(-5, 5, 17))))
 sigreg_N_slices = 16
 
@@ -149,7 +151,7 @@ while true
     global losses
     global losses_mse
 
-    data_loader = Flux.MLUtils.DataLoader(chunks_dev, batchsize=32, shuffle=true, partial=false)
+    data_loader = Flux.MLUtils.DataLoader(chunks_dev, batchsize=batchsize, shuffle=true, partial=false)
 
     epoch_losses = []
     
@@ -176,7 +178,9 @@ while true
 
             l_mse1 = Flux.mse(y1[(1+m_amp_offset):end, :, :], processed1)
             l_mse2 = Flux.mse(y2[(1+m_amp_offset):end, :, :], processed2)
-
+            =#
+            
+            #=
             if isnan(l_similarity); error("nan - similarity"); end
             if isnan(l_encoded_mean); error("nan - mean"); end
             # if isnan(l_var); error("nan - var"); end
