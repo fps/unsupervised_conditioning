@@ -7,7 +7,7 @@ if !@isdefined(init) || init
     Pkg.activate(".")
 
     println("Importing packages...")
-    import CUDA, Flux, WAV, Plots, DSP, Statistics
+    import CUDA, Flux, WAV, Plots, DSP, Statistics, FFTW, MultivariateStats, StatsBase
 
     Plots.GR.reset()
     
@@ -43,14 +43,15 @@ if !@isdefined(init) || init
     Plots.plot(Plots.plot(x), Plots.plot(y), Plots.plot(controls), layout=(3,1)) |> display
 
     println("Fixing some latents...")
-    fixed_latent_indices = Random.rand(1:length(x), 15)
+    fixed_latent_indices = Random.rand(1:length(x), 50)
     fixed_latent_values = hcat(controls...)[fixed_latent_indices, :] |> dev
 
     println("Setting up latent")
-    num_latent = 8
+    num_latent = 3
 
 
-    n_sub = 8
+    n_sub = 6
+    
     l_latent = div(48000, 2^n_sub)  * 2
 
     latent = 1f-15 .* randn(Float32, l_latent, num_latent, 1) |> dev
@@ -87,10 +88,10 @@ if !@isdefined(init) || init
     val_mask = 1f0 .- train_mask
 end
 
-limit = 1f-1
+limit = 1f-0
 
 println("Training...")
-for n in 1:5000
+for n in 1:25000
 # n = 0
 # while true
     global losses
@@ -107,19 +108,21 @@ for n in 1:5000
             train_mask[offset:end,:,:] .* y_dev[offset:end, :, :],
             train_mask[offset:end,:,:] .* y_hat)
 
-        # l_fixed = Flux.mse(latent_smooth[fixed_latent_indices, :, :], limit .* fixed_latent_values)
+        l_fixed = Flux.mse(latent_smooth[fixed_latent_indices, :, :], limit .* fixed_latent_values)
 
         l_limit = 0f0 * Flux.mse(latent_smooth, min.(max.(latent_smooth, -limit), limit))
 
-        l_mean = 1f-0 * Statistics.mean(Statistics.mean(latent_smooth, dims=1).^2)
+        l_mean = 0f-0 * Statistics.mean(Statistics.mean(latent_smooth, dims=1).^2)
 
+        l1 = 0f0 * Statistics.mean(abs.(latent_smooth))
+        
         l_val = (length(val_mask) / sum(val_mask)) * Flux.mse(
             val_mask[offset:end,:,:] .* y_dev[offset:end, :, :],
             val_mask[offset:end,:,:] .* y_hat)
 
         (
-            l_mse #= + l_fixed =# + l_limit + l_mean,
-            l_mse,  #= l_fixed, =# l_limit,  l_mean, l_val
+            l_mse + l_fixed  + l_limit + l_mean + l1,
+            l_mse,  l_fixed, l_limit,  l_mean, l_val
         )
     end
     Flux.update!(opt, [latent, m_amp], grads[1])
@@ -150,11 +153,11 @@ spectrum_hop = 80
 
 latent_smooth = m_latent(latent)[24000 .+ (1:48000),:,1]
 
+n_spectrum_bins = 64
+
 spectra_starts = 1:spectrum_hop:(48000 - ((2 * n_spectrum_bins) + offset + spectrum_hop))
 
 n_spectrum_samples = 64
-
-n_spectrum_bins = 64
 
 spectra = []
 

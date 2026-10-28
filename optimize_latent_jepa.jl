@@ -6,22 +6,22 @@ import Flux, BSON, UnicodePlots, Statistics
 include("../jepa.jl/src/jepa.jl")
 
 trained = BSON.load("fender_upsampling.bson")
-latent2 = trained[:latent_cpu][:,:]'
+latent2 = trained[:latent_cpu][100:3000,:]'
 latent_pairs = (latent2[:,1:(end-1)], latent2[:,2:end])
 
-m_embedding = Flux.Chain(Flux.Dense(8 => 8), [Flux.Dense(8 => 8, Flux.leakyrelu) for n in 1:4]..., Flux.Dense(8 => 4, Flux.leakyrelu), Flux.Dense(4 => 4))
+m_embedding = Flux.Chain(Flux.Dense(8 => 8), [Flux.Dense(8 => 8, Flux.leakyrelu) for n in 1:4]..., Flux.Dense(8 => 4, Flux.leakyrelu), Flux.Dense(4 => 3))
 opt = Flux.setup(Flux.Adam(), m_embedding)
 
-N_random_directions = 3
+N_random_directions = 16
 
 epoch = 0
 while true;
     global epoch
     losses = [];
-    data_loader = Flux.MLUtils.DataLoader(latent_pairs, batchsize=32, partial=false);
-    for data in data_loader;
-        Ds = [JEPA.random_direction(4) for n in 1:N_random_directions]
-        evaluation_points = [5 .* randn(Float32, 15) for n in 1:N_random_directions]
+    data_loader = Flux.MLUtils.DataLoader(latent_pairs, batchsize=256, partial=false);
+    for data in data_loader
+        Ds = [JEPA.random_direction(3) for n in 1:N_random_directions]
+        evaluation_points = [20 .* (rand(Float32, 32) ./ 2) for n in 1:N_random_directions]
         
         l, g = Flux.withgradient(m_embedding) do m_embedding;
             e1 = m_embedding(data[1]);
@@ -45,7 +45,7 @@ while true;
     @info "epoch: $(epoch), loss: $(Statistics.mean(losses))";
 
     if epoch % 50 == 0
-        for n in 1:4; UnicodePlots.lineplot(m_embedding(latent2)[n,1:200], width=:auto) |> display; end
+        for n in 1:3; UnicodePlots.lineplot(m_embedding(latent2)[n,:], width=:auto) |> display; end
     end
     
     epoch += 1

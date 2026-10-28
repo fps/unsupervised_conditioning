@@ -119,7 +119,7 @@ for n in 1:20000
         # l_mse += Flux.mse(latent_smooth, min.(max.(latent_smooth, -1), 1))
 
         l_mean = 0f-0 * Statistics.mean(Statistics.mean(latent_smooth, dims=1).^2)
-        l_weight = 0f1 * Statistics.mean(latent_smooth.^2)
+        l_weight = 0f1 * Statistics.mean(abs.(latent_smooth))
 
         l_diff = 0f0 .* Float32(fs) * Statistics.mean(diff_weights .* diff(latent_smooth, dims=1).^2)
 

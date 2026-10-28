@@ -6,7 +6,7 @@ println("Activating package...")
 Pkg.activate(".")
 
 println("Importing packages...")
-import CUDA, Flux, WAV, Plots, DSP, Statistics, Random, ProgressBars, UnicodePlots, FFTW, MultivariateStats
+import CUDA, Flux, WAV, Plots, DSP, Statistics, Random, ProgressBars, UnicodePlots, FFTW, MultivariateStats, DelimitedFiles
 
 # Plots.unicodeplots()
 Plots.default(dpi=300, linewidth=0.5, alpha=0.75, size=(1000, 1200))
@@ -23,13 +23,23 @@ include("synthetic_data.jl")
 
 println("Reading training data...")
 
+clap_in_audio = 3.984
+
+after_clap_in_audio = 4.5
+
 # #=
 # y, y_fs = WAV.wavread("data/fender_blues_junior/Take7_Audio 1-1.3.wav");
 y, y_fs = WAV.wavread("data/fender_blues_junior/Take6_Audio 1-1.wav");
 
+valid_range = Int(floor((after_clap_in_audio*48000))):((12*60+45)*48000)
+
+# knob_positions[:,1] .-= after_clap_in_audio
+
 lag = 45
 
 y = Float32.(y[(1+lag):end])
+
+y = y[valid_range]
 
 # y = y[1:(div(length(y), 2))]
 # y = y[(1:(48000*10)) .+ 48000 .+ 32]
@@ -43,8 +53,10 @@ y ./= y_std
 x, x_fs = WAV.wavread("data/fender_blues_junior/varying_noise_20_min_seed_0.wav");
 
 x = Float32.(x[1:(end-lag)])
+x = x[valid_range]
+
 # x = x[(1:length(y)) .+ 48000 .+ 0]
-x = x[1:length(y)]
+# x = x[1:length(y)]
 
 x_mean = Statistics.mean(x)
 x_std = Statistics.std(x)
@@ -61,8 +73,9 @@ println("Setting up latent...")
 latent_sampling_rate = 4
 latent_period = Int(floor(y_fs / latent_sampling_rate))
 
-num_latent = 4
-latent = 1f-5 .* randn(Float32, Int(ceil(length(y) / latent_period)), num_latent, 1) |> dev
+num_latent = 3
+# latent = 1f-5 .* randn(Float32, Int(ceil(length(y) / latent_period)), num_latent, 1) |> dev
+latent = initial_latent |> dev
 
 m_latent = Flux.Upsample(latent_period, :bilinear) |> dev
 
@@ -140,7 +153,7 @@ for n in 1:n_epochs
                     m_latent(latent[(1+(index-1)*chunk_hop_latent):(chunksize_latent+(index-1)*chunk_hop_latent), :, :]), dims=2)))
             l_latent_mag = 1f-2 * Statistics.mean(latent[(1+(index-1)*chunk_hop_latent):(chunksize_latent+(index-1)*chunk_hop_latent), :, :].^2)
             
-            (l_mse + l_latent_mag, l_mse, l_latent_mag)
+            (l_mse, l_mse, l_latent_mag)
         end
 
         push!(losses_epoch, loss[1])
@@ -152,7 +165,7 @@ for n in 1:n_epochs
 
     push!(losses, Statistics.mean(losses_epoch))
 
-    if (n-1) % 100 == 0
+    if (n-1) % 1 == 0
         for l in 1:num_latent
             UnicodePlots.lineplot(cpu(latent[1:div(size(latent, 1), 1), l, 1]), width=:auto) |> display
         end
@@ -183,8 +196,8 @@ for n in spectra_starts
 end
 
 spectrogram = cpu(cat(spectra..., dims=2))
-pca = MultivariateStats.fit(MultivariateStats.PCA, log10.(spectrogram), maxoutdim=4)
-pca2 = MultivariateStats.fit(MultivariateStats.PCA, cpu(latent[:,:])', maxoutdim=4)
+pca = MultivariateStats.fit(MultivariateStats.PCA, log10.(spectrogram), maxoutdim=3)
+pca2 = MultivariateStats.fit(MultivariateStats.PCA, cpu(latent[:,:])', maxoutdim=3)
 
 
 Plots.plot(
@@ -200,14 +213,3 @@ Plots.plot(MultivariateStats.predict(ica, log10.(spectrogram))')
 
 latent2 = permutedims(cpu(latent), (2, 3, 1))
 
-
-#
-
-pairs = [(latent2[:,:,k], latent2[:,:,k+1]) for k in size(latent2, 3)-1]
-
-m_embedding = Flux.Chain(Flux.Dense(8 => 8), Flux.Dense(8 => 8, Flux.leakyrelu), Flux.Dense(8 => 4, Flux.leakyrelu), Flux.Dense(4 => 4))
-
-while true
-    data_loader = Flux.MLUtils.DataLoader(latent2, batchsize=32, partial=false)
-
-    for 
