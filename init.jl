@@ -1,6 +1,6 @@
 @info "Initializing..."
 
-ENV["JULIA_CUDA_HARD_MEMORY_LIMIT"] = "6GiB"
+ENV["JULIA_CUDA_HARD_MEMORY_LIMIT"] = "8GiB"
 
 import Pkg
 

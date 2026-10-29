@@ -11,14 +11,14 @@ input, input_fs = WAV.wavread("data/nam_input.wav")
 # input, input_fs = WAV.wavread("signal.wav")
 # input, input_fs = WAV.wavread("data/nam_input_spliced_noise.wav")
 
-input = input[1:(30*48000)]
+# input = input[1:(30*48000)]
 
 test_signal = 1f-2 .* randn(4 * m_amp_offset)
 
 @info "Splicing test signal..."
 input = splice_signals(input, n -> test_signal[1:n], m_amp_offset)
 
-WAV.wavwrite(input, "data/nam_input_spliced_noise.wav", Fs=input_fs)
+# WAV.wavwrite(input, "data/nam_input_spliced_noise.wav", Fs=input_fs)
 
 samplerate = Cint(round(input_fs))
 
@@ -50,13 +50,7 @@ buffers_amp[gain] .= 0.75
 buffers_amp[tonestack] .= 3
 buffers_amp[lowcut] .= 0.1
 
-@info "Setting up supervised controls..."
-
-# supervised_controls = [[0.0, 0.0, 0.0], [-1, 0, 0], [1, 0, 0], [0, -1, 0], [0, 1, 0], [0, 0, -1], [0, 0, 1]]
-supervised_controls = [[i, j, k] for i in [-1,0,1] for j in [-1, 0, 1] for k in [-1, 0, 1]]
-
-supervised_chunk_size = 12 * m_amp_offset
-
+#=
 for n in ((1:length(supervised_controls)) .- 1)
     buffers_amp[bass][(1 + (n * supervised_chunk_size)):((n+1) * supervised_chunk_size)] .= (supervised_controls[n+1][1] ./ 2) .+ 0.5
     buffers_amp[mid][(1 + (n * supervised_chunk_size)):((n+1) * supervised_chunk_size)] .= (supervised_controls[n+1][2] ./ 2) .+ 0.5
@@ -66,10 +60,20 @@ end
 UnicodePlots.lineplot(buffers_amp[bass][1:(supervised_chunk_size*length(supervised_controls))], width=:auto, title="bass") |> display
 UnicodePlots.lineplot(buffers_amp[mid][1:(supervised_chunk_size*length(supervised_controls))], width=:auto, title="mid") |> display
 UnicodePlots.lineplot(buffers_amp[treble][1:(supervised_chunk_size*length(supervised_controls))], width=:auto, title="treble") |> display
+=#
+
+buffers_amp[bass][1:size(supervised_controls, 2)] .= (supervised_controls[1,:] .+ 1) ./ 2
+buffers_amp[mid][1:size(supervised_controls, 2)] .= (supervised_controls[2,:] .+ 1) ./ 2
+buffers_amp[treble][1:size(supervised_controls, 2)] .= (supervised_controls[3,:] .+ 1) ./ 2
+
+UnicodePlots.lineplot(buffers_amp[bass][1:size(supervised_controls, 2)], width=:auto, title="bass") |> display
+UnicodePlots.lineplot(buffers_amp[mid][1:size(supervised_controls, 2)], width=:auto, title="mid") |> display
+UnicodePlots.lineplot(buffers_amp[treble][1:size(supervised_controls, 2)], width=:auto, title="treble") |> display
+
 
 @info "Setting up unsupervised controls..."
 
-unsupervised_indices = (1 + supervised_chunk_size * length(supervised_controls)):length(input)
+unsupervised_indices = (1 + size(supervised_controls, 2)):length(input)
 
 t = (1:length(unsupervised_indices)) ./ samplerate
 
@@ -109,7 +113,10 @@ LADSPA.run(cabinet, buffers_cabinet, 64)
 # WAV.wavwrite(buffers_cabinet[4], "data/test/Take1_Audio 1-1_AmpVTS_CabinetIV.wav", Fs=samplerate)
 # WAV.wavwrite(buffers_cabinet[4], "data/synthetic/AmpVTS/nam_input_add_noise_output.wav", Fs=samplerate)
 # WAV.wavwrite(buffers_cabinet[4], "signal_output.wav", Fs=samplerate)
-WAV.wavwrite(buffers_cabinet[4], "data/synthetic/AmpVTS/nam_input_spliced_noise_output.wav", Fs=samplerate)
+
+# WAV.wavwrite(buffers_cabinet[4], "data/synthetic/AmpVTS/nam_input_spliced_noise_output.wav", Fs=samplerate)
+
+output = buffers_cabinet[4]
 
 @info "Closing shop..."
 

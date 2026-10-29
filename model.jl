@@ -4,17 +4,12 @@ fft_size = 1024
 fft_hop = div(fft_size, 2)
 
 m_encoder = Flux.Chain(
-    Flux.Dense(fft_size => 64),
-    Flux.Dense(64 => 64, Flux.leakyrelu),
-    # Flux.BatchNorm(64),
-    Flux.Dense(64 => 64, Flux.leakyrelu),
-    # Flux.BatchNorm(64),
-    Flux.Dense(64 => 64, Flux.leakyrelu),
-    # Flux.BatchNorm(64),
+    Flux.Dense(fft_size => 128, Flux.leakyrelu),
+    Flux.Dense(128 => 64, Flux.leakyrelu),
     Flux.Dense(64 => 32, Flux.leakyrelu),
     Flux.Dense(32 => 16, Flux.leakyrelu),
     Flux.Dense(16 => 16, Flux.leakyrelu),
-    # Flux.Dense(16 => 8, Flux.tanh),
+    # Flux.Dense(16 => 8, Flux.leakyrelu),
     Flux.Dense(16 => 3),
 ) |> dev
 
@@ -32,7 +27,10 @@ m_amp_offset = 48000 - size(m_amp(dev(randn(Float32, 48000, 4, 1))), 1)
 
 @info "Setting up optimizer..."
 
-opt = Flux.setup(Flux.Adam(2f-4), [m_encoder, m_amp])
+lr = 1f-4
+
+opt = Flux.setup(Flux.Adam(lr), [m_encoder, m_amp])
+# opt = Flux.setup(Flux.AdamW(;eta=lr, lambda=0.1), [m_encoder, m_amp])
 
 @info "Done."
 
