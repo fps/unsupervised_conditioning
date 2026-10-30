@@ -43,9 +43,9 @@ chunks_y = cat([y[(start + m_amp_offset):(start + 3 * m_amp_offset - 1)] for sta
 @info "Calculating spectra..."
 
 # chunks_x_fft = cat([spectrum(x[(start + 4 * m_amp_offset):(start + 6 * m_amp_offset - 1)], fft_size, fft_hop) for start in chunk_starts]..., dims=2)
-chunks_y_fft = cat([spectrum(y[(start + 4 * m_amp_offset):(start + 6 * m_amp_offset - 1)], fft_size, fft_hop) for start in chunk_starts]..., dims=2)
+chunks_y_fft_raw = cat([spectrum(y[(start + 4 * m_amp_offset):(start + 6 * m_amp_offset - 1)], fft_size, fft_hop) for start in chunk_starts]..., dims=2)
 # chunks_y_fft = log.(chunks_y_fft)
-chunks_y_fft .-= Statistics.mean(chunks_y_fft)
+chunks_y_fft = chunks_y_fft_raw .- Statistics.mean(chunks_y_fft)
 chunks_y_fft ./= Statistics.std(chunks_y_fft)
 
 # STAHP
