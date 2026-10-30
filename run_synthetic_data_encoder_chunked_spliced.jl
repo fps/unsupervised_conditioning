@@ -1,6 +1,6 @@
 @info "Training..."
 
-epoch = 1
+# epoch = 1
 
 losses = []
 
@@ -15,14 +15,25 @@ batchsize = 2^4
 sigreg_test_points = dev(Float32.(collect(range(-5, 5, 17))))
 sigreg_N_slices = 16
 
-while true
-    global epoch
+train_amp = true
+
+n_epochs = 2000
+n_warmup = 20
+
+lr_amp = Float32.(cat(range(1f-5, 1f-4, n_warmup), 1f-4 * ones(n_epochs), dims=1))
+lr_encoder = Float32.(cat(range(1f-5, 1f-4, n_warmup), range(1f-4, 1f-5, n_epochs), dims=1))
+
+for epoch in 1:length(lr_amp)
+    # global epoch
     global losses
     global losses_mse
 
     data_loader = Flux.MLUtils.DataLoader(chunks_dev, batchsize=batchsize, shuffle=true, partial=false)
 
     epoch_losses = []
+
+    Flux.adjust!(opt[1], lr_encoder[epoch])
+    Flux.adjust!(opt[2], lr_amp[epoch])
     
     for (x1, y1, x2, y2, x1_spec, y1_spec, x2_spec, y2_spec, supervision1, supervision2) in ProgressBars.ProgressBar(data_loader)
         directions = dev(randn(Float32, sigreg_N_slices, 3))
@@ -48,7 +59,7 @@ while true
             
             l_limits = Flux.mse(min.(1, max.(-1, encoded1)), encoded1) + Flux.mse(min.(1, max.(-1, encoded2)), encoded2)
 
-            l_supervision += 1f2 * Statistics.mean([Flux.mse(supervision1[1:1,:] .* encoded1, supervision1[2:4, :]), Flux.mse(supervision2[1:1,:] .* encoded2, supervision2[2:4, :])])
+            l_supervision += 1f1 * Statistics.mean([Flux.mse(supervision1[1:1,:] .* encoded1, supervision1[2:4, :]), Flux.mse(supervision2[1:1,:] .* encoded2, supervision2[2:4, :])])
 
             l_similarity += 1f1 * Flux.mse(similarity_weights .* encoded1, similarity_weights .* encoded2)
             # sim_unsupervised = (1 .- supervision1[1:1,:]) .* (1 .- supervision2[1:1,:])
@@ -56,11 +67,11 @@ while true
             # l_similarity += 1f1 * Flux.mse(similarity_weights .* encoded1 .* sim_supervised, similarity_weights .* encoded2 .* sim_supervised)
             # l_similarity += 1f1 * Flux.mse(similarity_weights .* encoded1 .* sim_unsupervised, similarity_weights .* encoded2 .* sim_unsupervised)
 
-            # #=
-            mean_encoded = 5f-1 .* (encoded1 .+ encoded2)
-            processed = m_amp(cat(x2, permutedims(repeat(mean_encoded, 1, 1, size(x2, 1)), (3, 1, 2)), dims=2)[:,:,:])
-            l_mse = 1f0 * Flux.mse(y2[(1+m_amp_offset):end, :, :], processed)
-            # =#
+            if train_amp
+                mean_encoded = 5f-1 .* (encoded1 .+ encoded2)
+                processed = m_amp(cat(x2, permutedims(repeat(mean_encoded, 1, 1, size(x2, 1)), (3, 1, 2)), dims=2)[:,:,:])
+                l_mse = 1f0 * Flux.mse(y2[(1+m_amp_offset):end, :, :], processed)
+            end
             
             # processed1 = m_amp(cat(x1, permutedims(repeat(encoded1, 1, 1, size(x1, 1)), (3, 1, 2)), dims=2)[:,:,:])
             # processed2 = m_amp(cat(x2, permutedims(repeat(encoded2, 1, 1, size(x2, 1)), (3, 1, 2)), dims=2)[:,:,:])

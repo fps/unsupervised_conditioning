@@ -42,13 +42,13 @@ chunks_y = cat([y[(start + m_amp_offset):(start + 3 * m_amp_offset - 1)] for sta
 
 @info "Calculating spectra..."
 
-chunks_x_fft = cat([spectrum(x[(start + 4 * m_amp_offset):(start + 6 * m_amp_offset - 1)], fft_size, fft_hop) for start in chunk_starts]..., dims=2)
+# chunks_x_fft = cat([spectrum(x[(start + 4 * m_amp_offset):(start + 6 * m_amp_offset - 1)], fft_size, fft_hop) for start in chunk_starts]..., dims=2)
 chunks_y_fft = cat([spectrum(y[(start + 4 * m_amp_offset):(start + 6 * m_amp_offset - 1)], fft_size, fft_hop) for start in chunk_starts]..., dims=2)
 
 # STAHP
 
-chunks_x_fft .-= Statistics.mean(chunks_x_fft, dims=2)
-chunks_x_fft ./= (0.0001 .+ Statistics.std(chunks_x_fft, dims=2))
+# chunks_x_fft .-= Statistics.mean(chunks_x_fft, dims=2)
+# chunks_x_fft ./= (0.0001 .+ Statistics.std(chunks_x_fft, dims=2))
 
 chunks_y_fft .-= Statistics.mean(chunks_y_fft, dims=2)
 chunks_y_fft ./= (0.0001 .+ Statistics.std(chunks_y_fft, dims=2))
@@ -83,9 +83,9 @@ chunks = (
     chunks_y[:,:,1:(end-1)],
     chunks_x[:,:,2:end],
     chunks_y[:,:,2:end],
-    chunks_x_fft[:,1:(end-1)],
+    # chunks_x_fft[:,1:(end-1)],
     chunks_y_fft[:,1:(end-1)],
-    chunks_x_fft[:,2:end],
+    # chunks_x_fft[:,2:end],
     chunks_y_fft[:,2:end],
     chunks_supervision[:,1:(end-1)],
     chunks_supervision[:,2:end]

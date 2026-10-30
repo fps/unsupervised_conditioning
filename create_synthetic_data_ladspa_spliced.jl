@@ -48,7 +48,7 @@ buffers_amp = LADSPA.prepare_buffers(d_amp, samplerate, length(input))
 
 buffers_amp[gain] .= 0.75
 buffers_amp[tonestack] .= 3
-buffers_amp[lowcut] .= 0.1
+buffers_amp[lowcut] .= 0
 
 #=
 for n in ((1:length(supervised_controls)) .- 1)
@@ -78,16 +78,19 @@ unsupervised_indices = (1 + size(supervised_controls, 2)):length(input)
 t = (1:length(unsupervised_indices)) ./ samplerate
 
 f1 = 1 / t[end]
-p1 = 0.456
+# p1 = 0.456
+p1 = 0
 
 f2 = 7 / t[end]
-p2 = 2.9794
+# p2 = 2.9794
+p2 = 0
 
 f3 = 23 / t[end]
-p3 = 6.3445
+# p3 = 6.3445
+p3 = 0
 
 buffers_amp[bass][unsupervised_indices] .= 0.5 .+ 0.5 .* sin.((2 * pi * f1) .* t .+ p1) 
-buffers_amp[treble][unsupervised_indices] .= 0.5 .+ 0.5 .* sin.((2 * pi * f2) .* t .+ 2) 
+buffers_amp[treble][unsupervised_indices] .= 0.5 .+ 0.5 .* sin.((2 * pi * f2) .* t .+ p2) 
 buffers_amp[mid][unsupervised_indices] .= 0.5 .+ 0.5 .* sin.((2 * pi * f3) .* t .+ p3) 
 
 buffers_amp[12] .= input

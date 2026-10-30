@@ -4,7 +4,7 @@ fft_size = 1024
 fft_hop = div(fft_size, 2)
 
 m_encoder = Flux.Chain(
-    Flux.Dense(fft_size => 128, Flux.leakyrelu),
+    Flux.Dense(real_spectrum_length(fft_size) => 128, Flux.leakyrelu),
     Flux.Dense(128 => 64, Flux.leakyrelu),
     Flux.Dense(64 => 32, Flux.leakyrelu),
     Flux.Dense(32 => 16, Flux.leakyrelu),
