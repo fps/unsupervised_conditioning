@@ -10,7 +10,7 @@ similarity_weights = dev([1f0 1f0 1f0]')
 
 # STAHP
 
-batchsize = 2^4
+batchsize = 2^5
 
 sigreg_test_points = dev(Float32.(collect(range(-5, 5, 17))))
 sigreg_N_slices = 16
@@ -20,8 +20,8 @@ train_amp = true
 n_epochs = 2000
 n_warmup = 20
 
-lr_amp = Float32.(cat(range(1f-5, 1f-4, n_warmup), 1f-4 * ones(n_epochs), dims=1))
 lr_encoder = Float32.(cat(range(1f-5, 1f-4, n_warmup), range(1f-4, 1f-5, n_epochs), dims=1))
+lr_amp = Float32.(cat(range(1f-5, 1f-4, n_warmup), 1f-4 * ones(n_epochs), dims=1))
 
 for epoch in 1:length(lr_amp)
     # global epoch
@@ -35,7 +35,7 @@ for epoch in 1:length(lr_amp)
     Flux.adjust!(opt[1], lr_encoder[epoch])
     Flux.adjust!(opt[2], lr_amp[epoch])
     
-    for (x1, y1, x2, y2, x1_spec, y1_spec, x2_spec, y2_spec, supervision1, supervision2) in ProgressBars.ProgressBar(data_loader)
+    for (x1, y1, x2, y2, y1_spec, y2_spec, supervision1, supervision2) in ProgressBars.ProgressBar(data_loader)
         directions = dev(randn(Float32, sigreg_N_slices, 3))
         
         for n in 1:sigreg_N_slices
@@ -50,8 +50,8 @@ for epoch in 1:length(lr_amp)
             encoded2 = m_encoder(cat(x2_spec, y2_spec, dims=1) .+ fft_noises[2])
             =#
             
-            encoded1 = m_encoder(cat(x1_spec, y1_spec, dims=1))
-            encoded2 = m_encoder(cat(x2_spec, y2_spec, dims=1))
+            encoded1 = m_encoder(y1_spec)
+            encoded2 = m_encoder(y2_spec)
 
             l_supervision = 0 
             l_similarity = 0
@@ -111,7 +111,7 @@ for epoch in 1:length(lr_amp)
     
     if (epoch - 1) % 1 == 0
         for n in 1:3
-            UnicodePlots.lineplot(cpu(m_encoder(cat(chunks_dev[5], chunks_dev[6], dims=1)))[n,:], width=:auto, ylim=[-1.1, 1.1], xlim=[1, size(chunks_dev[5], 2)]) |> display
+            UnicodePlots.lineplot(cpu(m_encoder(chunks_dev[5]))[n,:], width=:auto, ylim=[-1.1, 1.1], xlim=[1, size(chunks_dev[5], 2)]) |> display
         end
     
         # UnicodePlots.lineplot(log10.(losses), width=:auto) |> display
