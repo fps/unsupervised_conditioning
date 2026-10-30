@@ -1,7 +1,9 @@
 @info "Setting up model..."
 
+n_freqs = 50
+
 m_encoder = Flux.Chain(
-    Flux.Dense(real_spectrum_length(fft_size) => 128),
+    Flux.Dense(n_freqs => 128, Flux.leakyrelu),
     Flux.Dense(128 => 64, Flux.leakyrelu),
     Flux.Dense(64 => 32, Flux.leakyrelu),
     Flux.Dense(32 => 16, Flux.leakyrelu),
@@ -28,6 +30,10 @@ lr = 1f-4
 
 opt = Flux.setup(Flux.Adam(lr), [m_encoder, m_amp])
 # opt = Flux.setup(Flux.AdamW(;eta=lr, lambda=0.1), [m_encoder, m_amp])
+
+LS = LogSpectrum.LogSpectrum(DSP.Windows.hann(m_amp_offset), 48000, 20, 5000, n_freqs)
+
+
 
 @info "Done."
 

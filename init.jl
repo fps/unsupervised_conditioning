@@ -18,9 +18,10 @@ cpu = Flux.cpu
 
 include("spectrum.jl")
 include("sigreg.jl")
+include("log_spectrum.jl")
 
 @info "Setting general parameters..."
-fft_size = 1024
-fft_hop = div(fft_size, 2)
+fft_size = 2048
+fft_hop = div(fft_size, 4)
 
 @info "Done."
