@@ -60,7 +60,7 @@ for epoch in 1:length(lr_amp)
 
             l_supervision += 1f1 * Statistics.mean([Flux.mse(supervision1[1:1,:] .* encoded1, supervision1[2:4, :]), Flux.mse(supervision2[1:1,:] .* encoded2, supervision2[2:4, :])])
 
-            l_similarity += 1f1 * Flux.mse(encoded1, encoded2)
+            l_similarity += 1f-1 * Flux.mse(encoded1, encoded2)
 
             if train_amp
                 mean_encoded = 5f-1 .* (encoded1 .+ encoded2)

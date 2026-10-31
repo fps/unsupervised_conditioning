@@ -4,12 +4,12 @@ n_freqs = 100
 
 m_encoder = Flux.Chain(
     Flux.Dense(n_freqs => 64),
-    # Flux.Dense(128 => 64, Flux.leakyrelu),
-    Flux.Dense(64 => 32, Flux.leakyrelu),
-    Flux.Dense(32 => 16, Flux.leakyrelu),
-    Flux.Dense(16 => 16, Flux.leakyrelu),
-    # Flux.Dense(16 => 8, Flux.leakyrelu),
-    Flux.Dense(16 => 3),
+    # Flux.Dense(128 => 64, Flux.rrelu),
+    Flux.Dense(64 => 32, Flux.rrelu),
+    Flux.Dense(32 => 16, Flux.rrelu),
+    # Flux.Dense(16 => 16, Flux.rrelu),
+    Flux.Dense(16 => 8, Flux.rrelu),
+    Flux.Dense(8 => 3),
 ) |> dev
 
 m_amp = Flux.Chain(
