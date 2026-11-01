@@ -63,6 +63,8 @@ chunks_y_fft ./= Statistics.std(chunks_y_fft)
 
 # N = div(fft_size,2); starts = Int.(floor.([N/(2^(n+1)) for n in 1:(log2(N)-1)])); ends = Int.(floor.([N/2^n for n in 1:(log2(N)-1)]))
 
+@info "Setting up supervision..."
+
 chunks_supervision = zeros(Float32, 4, length(chunk_starts))
 
 for n in 1:length(supervised_control_points)
@@ -71,17 +73,10 @@ for n in 1:length(supervised_control_points)
     chunks_supervision[2:4, (6*(n-1)) + 6] = supervised_control_points[n]
 end
 
-#=
-for n in 1:length(chunk_starts)
-    if n <= 2 * length(supervised_controls)
-        chunks_supervision[1, n] = 1
-        chunks_supervision[2:4, n] = supervised_controls[div(n+1, 2)]
-    end
-end
-=#
 
-# chunks_supervision = [ if n > 2*length(supervised_controls); nothing; else; supervised_controls[div(n+1, 2)]; end for n in 1:length(chunk_starts) ]
-# chunks_supervision = reshape(chunks_supervision, 1, length(chunks_supervision))
+@info "Setting up validation set..."
+chunks_validation = zeros(Float32, 1, length(chunk_starts))
+chunks_validation[rand((1+6*length(supervised_control_points)):length(chunk_starts), div(length(chunk_starts), 10))] .= 1
 
 chunks = (
     chunks_x[:,:,1:(end-1)],
@@ -93,7 +88,9 @@ chunks = (
     # chunks_x_fft[:,2:end],
     chunks_y_fft[:,2:end],
     chunks_supervision[:,1:(end-1)],
-    chunks_supervision[:,2:end]
+    chunks_supervision[:,2:end],
+    chunks_validation[1:(end-1)],
+    chunks_validation[2:end]
 )
 
 chunks_dev = chunks |> dev

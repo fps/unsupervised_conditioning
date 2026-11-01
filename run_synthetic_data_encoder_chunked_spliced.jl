@@ -13,7 +13,7 @@ train_amp = true
 
 n_epochs = 3000
 n_warmup = 50
-n_encoder_only = 100
+n_encoder_only = 0
 
 lr_encoder_max = 5f-5
 lr_encoder_min = 1f-6
@@ -39,13 +39,7 @@ for epoch in 1:length(lr_amp)
 
     train_amp = epoch > n_encoder_only
     
-    for (x1, y1, x2, y2, y1_spec, y2_spec, supervision1, supervision2) in ProgressBars.ProgressBar(data_loader)
-        directions = dev(randn(Float32, sigreg_N_slices, 3))
-        
-        for n in 1:sigreg_N_slices
-            directions[n,:] ./ LinearAlgebra.norm(directions[n,:])
-        end
-
+    for (x1, y1, x2, y2, y1_spec, y2_spec, supervision1, supervision2, validation1, validation2) in ProgressBars.ProgressBar(data_loader)
         fft_noises = [1f-1 .* randn(Float32, fft_size), 2] |> dev
         
         loss, grad = Flux.withgradient([m_encoder, m_amp]) do (m_encoder, m_amp)
@@ -55,6 +49,7 @@ for epoch in 1:length(lr_amp)
             l_supervision = 0 
             l_similarity = 0
             l_mse = 0
+            l_validation = 0
             
             l_limits = Flux.mse(min.(1, max.(-1, encoded1)), encoded1) + Flux.mse(min.(1, max.(-1, encoded2)), encoded2)
 
@@ -62,15 +57,19 @@ for epoch in 1:length(lr_amp)
 
             l_similarity += 1f-1 * Flux.mse(encoded1, encoded2)
 
+            validation2 = reshape(validation2, 1, 1, batchsize)
+            
             if train_amp
                 mean_encoded = 5f-1 .* (encoded1 .+ encoded2)
                 processed = m_amp(cat(x2, permutedims(repeat(mean_encoded, 1, 1, size(x2, 1)), (3, 1, 2)), dims=2)[:,:,:])
-                l_mse = 1f0 * Flux.mse(y2[(1+m_amp_offset):end, :, :], processed)
+                l_mse = 1f0 * Flux.mse((1 .- validation2) .* y2[(1+m_amp_offset):end, :, :], (1 .- validation2) .* processed)
+                l_validation = 1f0 * Flux.mse(validation2 .* y2[(1+m_amp_offset):end, :, :], validation2 .* processed)
             end
 
             (
                 l_supervision + l_similarity + l_mse + l_limits, 
                 l_mse,
+                l_validation,
                 l_limits,
             )
         end
@@ -90,7 +89,7 @@ for epoch in 1:length(lr_amp)
     push!(losses, mean_losses)
     
     if (epoch - 1) % 1 == 0
-        titles = ["Total loss", "MSE", "Limits loss"]
+        titles = ["Total loss", "MSE", "MSE validation", "Limits loss"]
         for n in 1:3
             UnicodePlots.lineplot(cpu(m_encoder(chunks_dev[5]))[n,:], width=:auto, ylim=[-1.1, 1.1], xlim=[1, size(chunks_dev[5], 2)]) |> display
         end
