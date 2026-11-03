@@ -8,7 +8,7 @@ import Pkg
 Pkg.activate(".")
 
 @info "Importing packages..."
-import CUDA, cuDNN, Flux, WAV, Plots, DSP, Statistics, Random, ProgressBars, UnicodePlots, FFTW, MultivariateStats, DelimitedFiles, LinearAlgebra
+import CUDA, cuDNN, Flux, WAV, Plots, DSP, Statistics, Random, ProgressBars, UnicodePlots, FFTW, MultivariateStats, DelimitedFiles, LinearAlgebra, FastRunningMedian
 
 # Plots.unicodeplots()
 Plots.default(dpi=300, linewidth=0.5, alpha=0.75, size=(1000, 1200))

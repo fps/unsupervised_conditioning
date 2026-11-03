@@ -13,7 +13,7 @@ train_amp = true
 
 n_epochs = 3000
 n_warmup = 50
-n_encoder_only = 0
+n_encoder_only = 100
 
 lr_encoder_max = 5f-5
 lr_encoder_min = 1f-6
@@ -24,8 +24,9 @@ lr_amp_min = 1f-5
 lr_encoder = Float32.(cat(range(lr_encoder_min, lr_encoder_max, n_warmup), range(lr_encoder_max, lr_encoder_min, n_epochs-n_warmup), dims=1))
 lr_amp = Float32.(cat(zeros(n_encoder_only), range(lr_amp_min, lr_amp_max, n_warmup), lr_amp_max * ones(n_epochs-n_warmup-n_encoder_only), dims=1))
 
-for epoch in 1:length(lr_amp)
-    # global epoch
+while true  
+# for epoch in 1:length(lr_amp)
+    global epoch
     global losses
     global losses_mse
     global train_amp
@@ -102,7 +103,7 @@ for epoch in 1:length(lr_amp)
     
     epoch += 1
 
-    if epoch >= 10000
+    if epoch >= n_epochs
         break
     end
 end

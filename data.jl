@@ -42,13 +42,21 @@ chunks_y = cat([y[(start + m_amp_offset):(start + 3 * m_amp_offset - 1)] for sta
 
 @info "Calculating spectra..."
 
+#=
 # chunks_x_fft = cat([spectrum(x[(start + 4 * m_amp_offset):(start + 6 * m_amp_offset - 1)], fft_size, fft_hop) for start in chunk_starts]..., dims=2)
-# chunks_y_fft_raw = cat([spectrum(y[(start + 4 * m_amp_offset):(start + 6 * m_amp_offset - 1)], fft_size, fft_hop) for start in chunk_starts]..., dims=2)
+chunks_y_fft_raw = cat([spectrum(y[(start + 5 * m_amp_offset + 1000):(start + 6 * m_amp_offset - 1)], fft_size, fft_hop) for start in chunk_starts]..., dims=2)
+chunks_y_fft = chunks_y_fft_raw
 # chunks_y_fft = log.(chunks_y_fft)
+=#
 
+# #=
 chunks_y_fft_raw = abs.(cat([LS(y[(start + 5 * m_amp_offset):(start + 6 * m_amp_offset - 1)]) for start in chunk_starts]..., dims=2))
 chunks_y_fft = chunks_y_fft_raw .- Statistics.mean(chunks_y_fft_raw)
 chunks_y_fft ./= Statistics.std(chunks_y_fft)
+# chunks_y_fft = FastRunningMedian.running_median(chunks_y_fft', 9)'
+
+
+# =#
 
 # STAHP
 
@@ -67,6 +75,9 @@ chunks_y_fft ./= Statistics.std(chunks_y_fft)
 
 chunks_supervision = zeros(Float32, 4, length(chunk_starts))
 
+# Each supervised episode is 12 m_amp_offsets long, but before that there is a 24 m_amp_offsets long ramp towards the
+# supervised episode. In total that are 36 m_amp_offsets and since one chunk is 6 m_am_offsets long the
+# index math below should check out. 
 for n in 1:length(supervised_control_points)
     chunks_supervision[1, (6*(n-1)) .+ (5:6)] .= 1
     chunks_supervision[2:4, (6*(n-1)) + 5] = supervised_control_points[n]

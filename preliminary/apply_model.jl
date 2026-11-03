@@ -18,12 +18,16 @@ model = m_amp |> g
 x_test, fs_x_test = WAV.wavread("data/test/Take1_Audio 1-1_short.wav")
 x_test = Float32.(x_test)
 
-for l1 in -1:0.4:1;
-    for l2 in -1:0.4:1;
-        for l3 in -1:0.4:1;
+x_test .-= x_mean
+x_test ./= x_std
+
+for l1 in -1:0.5:1;
+    for l2 in -1:0.5:1;
+        for l3 in -1:0.5:1;
             println("$(l1) $(l2) $(l3)")
             
-            y_test = model(reshape(cat(1.0*x_test, l1 * ones(Float32, length(x_test), 1), l2 * ones(Float32, length(x_test), 1), l3 * ones(Float32, length(x_test), 1), dims=2), length(x_test), 4, 1) |> g);
+            y_test = model(reshape(cat(1.0*x_test, l1 * ones(Float32, length(x_test), 1), l2 * ones(Float32, length(x_test), 1), l3 * ones(Float32, length(x_test), 1), dims=2), length(x_test), 4, 1) |> g) .*= y_std
+            y_test .+= y_mean
             f = open("data/test/output/output-take1-$(l1)-$(l2)-$(l3).wav", "w");
             WAV.wavwrite(y_test[:,1,1]|>c, f, Fs=48000);
             close(f);

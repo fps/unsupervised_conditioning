@@ -11,6 +11,8 @@ input, input_fs = WAV.wavread("data/nam_input.wav")
 # input, input_fs = WAV.wavread("signal.wav")
 # input, input_fs = WAV.wavread("data/nam_input_spliced_noise.wav")
 
+# input = zeros(Float32, length(input))
+
 # input = input[1:(30*48000)]
 
 test_signal = 1f-2 .* randn(4 * m_amp_offset)
@@ -46,7 +48,7 @@ buffers_amp = LADSPA.prepare_buffers(d_amp, samplerate, length(input))
 
 @info "Setting up common controls..."
 
-buffers_amp[gain] .= 0.75
+buffers_amp[gain] .= 0.9
 buffers_amp[tonestack] .= 3
 buffers_amp[lowcut] .= 0
 
@@ -61,6 +63,9 @@ UnicodePlots.lineplot(buffers_amp[bass][1:(supervised_chunk_size*length(supervis
 UnicodePlots.lineplot(buffers_amp[mid][1:(supervised_chunk_size*length(supervised_controls))], width=:auto, title="mid") |> display
 UnicodePlots.lineplot(buffers_amp[treble][1:(supervised_chunk_size*length(supervised_controls))], width=:auto, title="treble") |> display
 =#
+
+
+@info "Setting up supervised controls..."
 
 buffers_amp[bass][1:size(supervised_controls, 2)] .= (supervised_controls[1,:] .+ 1) ./ 2
 buffers_amp[mid][1:size(supervised_controls, 2)] .= (supervised_controls[2,:] .+ 1) ./ 2
@@ -117,9 +122,8 @@ LADSPA.run(cabinet, buffers_cabinet, 64)
 # WAV.wavwrite(buffers_cabinet[4], "data/synthetic/AmpVTS/nam_input_add_noise_output.wav", Fs=samplerate)
 # WAV.wavwrite(buffers_cabinet[4], "signal_output.wav", Fs=samplerate)
 
-# WAV.wavwrite(buffers_cabinet[4], "data/synthetic/AmpVTS/nam_input_spliced_noise_output.wav", Fs=samplerate)
-
 output = buffers_cabinet[4]
+# WAV.wavwrite(output, "data/synthetic/AmpVTS/nam_input_spliced_noise_output.wav", Fs=samplerate)
 
 @info "Closing shop..."
 

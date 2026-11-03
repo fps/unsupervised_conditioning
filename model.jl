@@ -2,13 +2,17 @@
 
 n_freqs = 100
 
+encoder_activation = Flux.leakyrelu
+# encoder_activation = Flux.rrelu
+
 m_encoder = Flux.Chain(
     Flux.Dense(n_freqs => 64),
-    # Flux.Dense(128 => 64, Flux.rrelu),
-    Flux.Dense(64 => 32, Flux.rrelu),
-    Flux.Dense(32 => 16, Flux.rrelu),
-    # Flux.Dense(16 => 16, Flux.rrelu),
-    Flux.Dense(16 => 8, Flux.rrelu),
+    Flux.Dense(64 => 64, encoder_activation),
+    Flux.Dense(64 => 64, encoder_activation),
+    Flux.Dense(64 => 64, encoder_activation),
+    Flux.Dense(64 => 32, encoder_activation),
+    Flux.Dense(32 => 16, encoder_activation),
+    Flux.Dense(16 => 8, encoder_activation),
     Flux.Dense(8 => 3),
 ) |> dev
 
@@ -33,7 +37,7 @@ opt = Flux.setup(Flux.Adam(lr), [m_encoder, m_amp])
 
 LS = LogSpectrum.LogSpectrum(DSP.Windows.hann(m_amp_offset), 48000, 20, 10000, n_freqs)
 
-
+epoch = 1
 
 @info "Done."
 
