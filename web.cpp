@@ -1,10 +1,12 @@
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 
+#include "model.h"
+
 auto process_net(const emscripten::val &input)
 {
   Eigen::Matrix<float, 4, 64> minput;
-  Eigen::Matrix<float, 4, 64> moutput;
+  // Eigen::Matrix<float, 1, 64> moutput;
 
   anna::op::process(net, minput, 64);  
   return std::array<float, 64>();

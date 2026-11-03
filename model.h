@@ -1,19 +1,28 @@
 #include <anna/op.hpp>
 
+#define INPUT_CHANNELS 4
+#define LAYER_CHANNELS 16
+#define OUTPUT_CHANNELS 1
+#define MAX_PROCESS_SIZE 128
+
 template<class NextOp>
-using Input = anna::op::linear2<float, 16, 4, 128, NextOp>;
+using Expand = anna::op::linear2<float, LAYER_CHANNELS, INPUT_CHANNELS, MAX_PROCESS_SIZE, NextOp>;
 
 template<int Dilation, class NextOp>
-using Layer = anna::op::conv1d<float, 16, 16, 3, Dilation, 128, anna::op::tanh<NextOp>>;
+using Layer = anna::op::conv1d<float, LAYER_CHANNELS, LAYER_CHANNELS, 3, Dilation, MAX_PROCESS_SIZE, anna::op::tanh<NextOp>>;
 
 template<class NextOp>
-using Block = Layer<1, Layer<2, Layer<4, Layer<8, Layer<16, Layer<32, Layer<64, Layer< 128, NextOp>>>>>>>>;
+using Block = Layer<1, Layer<2, Layer<4, Layer<8, Layer<LAYER_CHANNELS, Layer<32, Layer<64, Layer< MAX_PROCESS_SIZE, NextOp>>>>>>>>;
 
 template<class Op, class NextOp>
 using SkipConnection = anna::op::additive_shortcut<float, Op, NextOp>;
 
-typedef anna::op::output<float, 16, 128> Output;
+typedef anna::op::output<float, LAYER_CHANNELS, MAX_PROCESS_SIZE> IntermediateOutput;
 
-// Input<Layer<1, Layer<2, Layer<4, Layer<8, Layer<16, Layer<32, Layer<64, Layer<128, Output>>>>>>>>> net;
-Input<SkipConnection<Block<Output>, Block<Output>>> net;
+template<class NextOp>
+using Collapse = anna::op::linear2<float, 1, LAYER_CHANNELS, MAX_PROCESS_SIZE, NextOp>;
+
+typedef anna::op::output<float, OUTPUT_CHANNELS, MAX_PROCESS_SIZE> Output;
+
+Expand<SkipConnection<Block<IntermediateOutput>, Block<Collapse<Output>>>> net;
 
