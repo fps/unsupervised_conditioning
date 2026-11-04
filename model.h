@@ -10,10 +10,13 @@ template<class NextOp>
 using Expand = anna::op::linear2<float, LAYER_CHANNELS, INPUT_CHANNELS, MAX_PROCESS_SIZE, NextOp>;
 
 template<int Dilation, class NextOp>
-using Layer = anna::op::conv1d<float, LAYER_CHANNELS, LAYER_CHANNELS, 3, Dilation, MAX_PROCESS_SIZE, anna::op::tanh<NextOp>>;
+using Conv = anna::op::conv1d<float, LAYER_CHANNELS, LAYER_CHANNELS, 3, Dilation, MAX_PROCESS_SIZE, NextOp>;
+
+template<int Dilation, class NextOp>
+using Layer = Conv<Dilation, anna::op::leaky_relu<float, NextOp>>;
 
 template<class NextOp>
-using Block = Layer<1, Layer<2, Layer<4, Layer<8, Layer<LAYER_CHANNELS, Layer<32, Layer<64, Layer< MAX_PROCESS_SIZE, NextOp>>>>>>>>;
+using Block = Layer<1, Layer<2, Layer<4, Layer<8, Layer<16, Layer<32, Layer<64, NextOp>>>>>>>;
 
 template<class Op, class NextOp>
 using SkipConnection = anna::op::additive_shortcut<float, Op, NextOp>;
