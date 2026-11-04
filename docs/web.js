@@ -2041,6 +2041,135 @@ async function createWasm() {
       });
     };
 
+  var __emval_array_to_memory_view = (dst, src) => {
+      dst = Emval.toValue(dst);
+      src = Emval.toValue(src);
+      dst.set(src);
+    };
+
+  var emval_methodCallers = [];
+  var emval_addMethodCaller = (caller) => {
+      var id = emval_methodCallers.length;
+      emval_methodCallers.push(caller);
+      return id;
+    };
+  
+  
+  
+  var requireRegisteredType = (rawType, humanName) => {
+      var impl = registeredTypes[rawType];
+      if (undefined === impl) {
+        throwBindingError(`${humanName} has unknown type ${getTypeName(rawType)}`);
+      }
+      return impl;
+    };
+  var emval_lookupTypes = (argCount, argTypes) => {
+      var a = new Array(argCount);
+      for (var i = 0; i < argCount; ++i) {
+        a[i] = requireRegisteredType(HEAPU32[(((argTypes)+(i*4))>>2)],
+                                     `parameter ${i}`);
+      }
+      return a;
+    };
+  
+  
+  var emval_returnValue = (toReturnWire, destructorsRef, handle) => {
+      var destructors = [];
+      var result = toReturnWire(destructors, handle);
+      if (destructors.length) {
+        // void, primitives and any other types w/o destructors don't need to allocate a handle
+        HEAPU32[((destructorsRef)>>2)] = Emval.toHandle(destructors);
+      }
+      return result;
+    };
+  
+  
+  var emval_symbols = {
+  };
+  
+  var getStringOrSymbol = (address) => {
+      var symbol = emval_symbols[address];
+      if (symbol === undefined) {
+        return AsciiToString(address);
+      }
+      return symbol;
+    };
+  var __emval_create_invoker = (argCount, argTypesPtr, kind) => {
+      var GenericWireTypeSize = 8;
+  
+      var [retType, ...argTypes] = emval_lookupTypes(argCount, argTypesPtr);
+      var toReturnWire = retType.toWireType.bind(retType);
+      var argFromPtr = argTypes.map(type => type.readValueFromPointer.bind(type));
+      argCount--; // remove the extracted return type
+  
+      var captures = {'toValue': Emval.toValue};
+      var args = argFromPtr.map((argFromPtr, i) => {
+        var captureName = `argFromPtr${i}`;
+        captures[captureName] = argFromPtr;
+        return `${captureName}(args${i ? '+' + i * GenericWireTypeSize : ''})`;
+      });
+      var functionBody;
+      switch (kind){
+        case 0:
+          functionBody = 'toValue(handle)';
+          break;
+        case 2:
+          functionBody = 'new (toValue(handle))';
+          break;
+        case 3:
+          functionBody = '';
+          break;
+        case 1:
+          captures['getStringOrSymbol'] = getStringOrSymbol;
+          functionBody = 'toValue(handle)[getStringOrSymbol(methodName)]';
+          break;
+      }
+      functionBody += `(${args})`;
+      if (!retType.isVoid) {
+        captures['toReturnWire'] = toReturnWire;
+        captures['emval_returnValue'] = emval_returnValue;
+        functionBody = `return emval_returnValue(toReturnWire, destructorsRef, ${functionBody})`;
+      }
+      functionBody = `return function (handle, methodName, destructorsRef, args) {
+${functionBody}
+}`;
+  
+      var invokerFunction = new Function(Object.keys(captures), functionBody)(...Object.values(captures));
+      var functionName = `methodCaller<(${argTypes.map(t => t.name)}) => ${retType.name}>`;
+      return emval_addMethodCaller(createNamedFunction(functionName, invokerFunction));
+    };
+
+
+  var __emval_get_property = (handle, key) => {
+      handle = Emval.toValue(handle);
+      key = Emval.toValue(key);
+      return Emval.toHandle(handle[key]);
+    };
+
+  var __emval_incref = (handle) => {
+      if (handle > 9) {
+        emval_handles[handle + 1] += 1;
+      }
+    };
+
+  
+  
+  var __emval_invoke = (caller, handle, methodName, destructorsRef, args) => {
+      return emval_methodCallers[caller](handle, methodName, destructorsRef, args);
+    };
+
+  var __emval_new_array = () => Emval.toHandle([]);
+
+  
+  var __emval_new_cstring = (v) => Emval.toHandle(getStringOrSymbol(v));
+
+  
+  
+  var __emval_run_destructors = (handle) => {
+      var destructors = Emval.toValue(handle);
+      runDestructors(destructors);
+      __emval_decref(handle);
+    };
 
   var abortOnCannotGrowMemory = (requestedSize) => {
       abort(`Cannot enlarge memory arrays to size ${requestedSize} bytes (OOM). Either (1) compile with -sINITIAL_MEMORY=X with X higher than the current value ${HEAP8.length}, (2) compile with -sALLOW_MEMORY_GROWTH which allows increasing the size at runtime, or (3) if you want malloc to return NULL (0) instead of this abort, compile with -sABORTING_MALLOC=0`);
@@ -2338,7 +2467,6 @@ Module['FS_createPreloadedFile'] = FS.createPreloadedFile;
   'stackTrace',
   'getNativeTypeSize',
   'getFunctionArgsName',
-  'requireRegisteredType',
   'createJsInvokerSignature',
   'getEnumValueType',
   'PureVirtualError',
@@ -2375,10 +2503,6 @@ Module['FS_createPreloadedFile'] = FS.createPreloadedFile;
   'char_9',
   'makeLegalFunctionName',
   'count_emval_handles',
-  'getStringOrSymbol',
-  'emval_returnValue',
-  'emval_lookupTypes',
-  'emval_addMethodCaller',
 ];
 missingLibrarySymbols.forEach(missingLibrarySymbol)
 
@@ -2616,6 +2740,7 @@ missingLibrarySymbols.forEach(missingLibrarySymbol)
   'getTypeName',
   'getFunctionName',
   'heap32VectorToArray',
+  'requireRegisteredType',
   'usesDestructorStack',
   'checkArgCount',
   'getRequiredArgCount',
@@ -2645,8 +2770,12 @@ missingLibrarySymbols.forEach(missingLibrarySymbol)
   'emval_freelist',
   'emval_handles',
   'emval_symbols',
+  'getStringOrSymbol',
   'Emval',
+  'emval_returnValue',
+  'emval_lookupTypes',
   'emval_methodCallers',
+  'emval_addMethodCaller',
 ];
 unexportedSymbols.forEach(unexportedRuntimeSymbol);
 
@@ -2743,7 +2872,23 @@ var wasmImports = {
   /** @export */
   _embind_register_void: __embind_register_void,
   /** @export */
+  _emval_array_to_memory_view: __emval_array_to_memory_view,
+  /** @export */
+  _emval_create_invoker: __emval_create_invoker,
+  /** @export */
   _emval_decref: __emval_decref,
+  /** @export */
+  _emval_get_property: __emval_get_property,
+  /** @export */
+  _emval_incref: __emval_incref,
+  /** @export */
+  _emval_invoke: __emval_invoke,
+  /** @export */
+  _emval_new_array: __emval_new_array,
+  /** @export */
+  _emval_new_cstring: __emval_new_cstring,
+  /** @export */
+  _emval_run_destructors: __emval_run_destructors,
   /** @export */
   emscripten_resize_heap: _emscripten_resize_heap,
   /** @export */

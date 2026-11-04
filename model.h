@@ -25,5 +25,4 @@ using Collapse = anna::op::linear2<float, 1, LAYER_CHANNELS, MAX_PROCESS_SIZE, N
 
 typedef anna::op::output<float, OUTPUT_CHANNELS, MAX_PROCESS_SIZE> Output;
 
-Expand<SkipConnection<Block<IntermediateOutput>, Block<Collapse<Output>>>> net;
-
+typedef Expand<SkipConnection<Block<IntermediateOutput>, Block<Collapse<Output>>>> Net;
