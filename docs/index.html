@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
 <head>
 </head>
@@ -13,12 +14,14 @@
   
   <script src="web.js"></script>
   <script>
-    a = new Float32Array(64 * 4);
-    for (i = 0; i < 64 * 4; ++i) {
+    a = new Float32Array(1024 * 4);
+    
+    for (i = 0; i < 1024 * 4; ++i) {
         a[i] = i;
     }
 
     var audioContext = null;
+    var gain = 1.0;
    
     function setup() {
         console.log("setup()");
@@ -36,9 +39,27 @@
         script_node.addEventListener("audioprocess", (e) => {
             // console.log("tat");
             // console.log(e.inputBuffer.getChannelData(0)[0]);
+            /*
             for (i = 0; i < 4096; ++i)
             {
                 e.outputBuffer.getChannelData(0)[i] = Math.tanh(10 * e.inputBuffer.getChannelData(0)[i]);
+                }
+            */
+
+            for (i = 0; i < 4096 / 1024; ++i) {
+                for (j = 0; j < 1024; ++j) {
+                    a[j] = e.inputBuffer.getChannelData(0)[i * 1024 + j];
+                    a[j] = e.inputBuffer.getChannelData(0)[i * 1024 + j];
+                    a[j] = e.inputBuffer.getChannelData(0)[i * 1024 + j];
+                    a[j] = e.inputBuffer.getChannelData(0)[i * 1024 + j];
+                }
+                    
+                const output = Module.process_net(a);
+
+                for (j = 0; j < 1024; ++j) {
+                    // e.outputBuffer.getChannelData(0)[i * 1024 + j] = gain * output[j];
+                    e.outputBuffer.getChannelData(0)[i * 1024 + j] = gain * e.inputBuffer.getChannelData(0)[i * 1024 + j];
+                }
             }
         });
 

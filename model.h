@@ -4,7 +4,7 @@
 #define INPUT_CHANNELS 4
 #define LAYER_CHANNELS 16
 #define OUTPUT_CHANNELS 1
-#define MAX_PROCESS_SIZE 128
+#define MAX_PROCESS_SIZE 1024
 
 template<class NextOp>
 using Expand = anna::op::linear2<float, LAYER_CHANNELS, INPUT_CHANNELS, MAX_PROCESS_SIZE, NextOp>;
