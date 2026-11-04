@@ -1,4 +1,5 @@
-#include <anna/op.hpp>
+#include <anna/op/op.hpp>
+#include <anna/op/conv1d.hpp>
 
 #define INPUT_CHANNELS 4
 #define LAYER_CHANNELS 16
