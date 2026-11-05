@@ -111,7 +111,7 @@ void prepare_net(int seed)
 emscripten::val process_net(const emscripten::val &input, float bass, float mid, float treble)
 {
   auto input_v = emscripten::convertJSArrayToNumberVector<float>(input);
-  // std::cout << "input_v " << input_v.size() << " " << input_v[0] << "\n";
+
   Eigen::Matrix<float, 4, 1024> minput;
 
   for (int col = 0; col < 1024; ++col) {
@@ -127,6 +127,7 @@ emscripten::val process_net(const emscripten::val &input, float bass, float mid,
 
   for (int index = 0; index < 1024; ++index) {
     output_js.call<void>("push", net->end().m_input(0, index));
+    // output_js.call<void>("push", input_v[index]);
   }
   
   return output_js;
