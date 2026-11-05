@@ -16,6 +16,7 @@ m_encoder = Flux.Chain(
     Flux.Dense(8 => 3),
 ) |> dev
 
+
 m_amp = Flux.Chain(
     Flux.Conv((1, ), 4 => 16),
     Flux.SkipConnection(Flux.Chain([Flux.Conv((3,), 16 => 16, Flux.leakyrelu, dilation=2^(k-1)) for k in 1:10 ]...), (mx, x) -> (mx .+ x[(size(x, 1) - size(mx, 1) + 1):end, :, :])),

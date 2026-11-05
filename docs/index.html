@@ -29,6 +29,8 @@
        
     function setup() {
         console.log("setup()");
+        document.getElementById("start").disabled = true;
+        
         if (audioContext != null) {
             console.log("already initialized..");
             return;
@@ -45,10 +47,12 @@
         var script_node = audioContext.createScriptProcessor(4096, 1, 1);
 
         script_node.addEventListener("audioprocess", (e) => {
+            const input_gain = document.getElementById("input_gain").value;
+            
             const bass = document.getElementById("bass").value;
             const mid = document.getElementById("mid").value;
             const treble = document.getElementById("treble").value;
-            const input_gain = document.getElementById("input_gain").value;
+            
             const output_gain = document.getElementById("output_gain").value;
 
             // console.log("bass: " + bass + " mid: " + mid + " treble: " + treble);
