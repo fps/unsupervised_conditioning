@@ -5,7 +5,7 @@
 <body>
   <audio preload="auto" loop="true" src="Take1_Audio 1-1_short.wav" id="input"></audio>
 
-  <input type="button" value="start" onclick="setup()">
+  <input type="button" value="start" onclick="setup()" disabled id="start">
   <br>
   <input type="range" min="0" max="1" step="0.001" value="0.001" id="input_gain"> input gain
   <br>
@@ -35,7 +35,8 @@
         }
 
         console.log("prepare_net()");
-        Module.prepare_net();
+        d = new Date;
+        Module.prepare_net(d.getMilliseconds());
         
         audioContext = new AudioContext();
         const input_audio = document.getElementById("input");
@@ -73,6 +74,13 @@
 
         input_audio.play();
     }
+
+    var Module = {
+        onRuntimeInitialized: function() {
+            console.log("initialized");
+            document.getElementById("start").disabled = false;
+        }
+    };
   </script>
 </body>
 </html>

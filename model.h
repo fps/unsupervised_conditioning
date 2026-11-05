@@ -7,7 +7,7 @@
 #define MAX_PROCESS_SIZE 1024
 
 template<class NextOp>
-using Expand = anna::op::linear2<float, LAYER_CHANNELS, INPUT_CHANNELS, MAX_PROCESS_SIZE, NextOp>;
+using Expand = anna::op::linear2<float, LAYER_CHANNELS, INPUT_CHANNELS, MAX_PROCESS_SIZE, anna::op::vector_add<float, 16, NextOp>>;
 
 template<int Dilation, class NextOp>
 using Conv = anna::op::conv1d<float, LAYER_CHANNELS, LAYER_CHANNELS, 3, Dilation, MAX_PROCESS_SIZE, NextOp>;
@@ -24,7 +24,7 @@ using SkipConnection = anna::op::additive_shortcut<float, Op, NextOp>;
 typedef anna::op::output<float, LAYER_CHANNELS, MAX_PROCESS_SIZE> IntermediateOutput;
 
 template<class NextOp>
-using Collapse = anna::op::linear2<float, 1, LAYER_CHANNELS, MAX_PROCESS_SIZE, NextOp>;
+using Collapse = anna::op::linear2<float, 1, LAYER_CHANNELS, MAX_PROCESS_SIZE, anna::op::vector_add<float, 1, NextOp>>;
 
 typedef anna::op::output<float, OUTPUT_CHANNELS, MAX_PROCESS_SIZE> Output;
 

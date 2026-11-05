@@ -1,6 +1,7 @@
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 #include <iostream>
+#include <cstdlib>
 
 #include "model.h"
 
@@ -15,7 +16,7 @@
 // TestNet net;
 Net *net;
 
-void prepare_net()
+void prepare_net(int seed)
 {
   /*
   net = new TestNet;
@@ -23,10 +24,13 @@ void prepare_net()
   net->set<2>(Eigen::Matrix<float, 1, 16>::Random());
   */
 
+  srand(seed);
+  
   net = new Net;
   
   net->set<0>(Eigen::Matrix<float, 16, 4>::Random());
-
+  net->set<1>(Eigen::Vector<float, 16>::Random());
+  
   std::array<Eigen::Matrix<float, 16, 16>, 3> conv_weights;
 
   Eigen::Vector<float, LAYER_CHANNELS> biases;
@@ -34,128 +38,128 @@ void prepare_net()
   // Block 1
   
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().m_op.set<0>(conv_weights);
+  net->next().next().m_op.set<0>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().m_op.set<1>(biases);
+  net->next().next().m_op.set<1>(biases);
   
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().m_op.set<3>(conv_weights);
+  net->next().next().m_op.set<3>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().m_op.set<4>(biases);
+  net->next().next().m_op.set<4>(biases);
 
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().m_op.set<6>(conv_weights);
+  net->next().next().m_op.set<6>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().m_op.set<7>(biases);
+  net->next().next().m_op.set<7>(biases);
   
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().m_op.set<9>(conv_weights);
+  net->next().next().m_op.set<9>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().m_op.set<10>(biases);
+  net->next().next().m_op.set<10>(biases);
 
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().m_op.set<12>(conv_weights);
+  net->next().next().m_op.set<12>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().m_op.set<13>(biases);
+  net->next().next().m_op.set<13>(biases);
   
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().m_op.set<15>(conv_weights);
+  net->next().next().m_op.set<15>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().m_op.set<16>(biases);
+  net->next().next().m_op.set<16>(biases);
 
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().m_op.set<18>(conv_weights);
+  net->next().next().m_op.set<18>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().m_op.set<19>(biases);
+  net->next().next().m_op.set<19>(biases);
   
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().m_op.set<21>(conv_weights);
+  net->next().next().m_op.set<21>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().m_op.set<22>(biases);
+  net->next().next().m_op.set<22>(biases);
 
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().m_op.set<24>(conv_weights);
+  net->next().next().m_op.set<24>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().m_op.set<25>(biases);
+  net->next().next().m_op.set<25>(biases);
   
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().m_op.set<27>(conv_weights);
+  net->next().next().m_op.set<27>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().m_op.set<28>(biases);
+  net->next().next().m_op.set<28>(biases);
 
   // Block 2
 
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().next().set<0>(conv_weights);
+  net->next().next().next().set<0>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().next().set<1>(biases);
+  net->next().next().next().set<1>(biases);
   
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().next().set<3>(conv_weights);
+  net->next().next().next().set<3>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().next().set<4>(biases);
+  net->next().next().next().set<4>(biases);
 
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().next().set<6>(conv_weights);
+  net->next().next().next().set<6>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().next().set<7>(biases);
+  net->next().next().next().set<7>(biases);
   
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().next().set<9>(conv_weights);
+  net->next().next().next().set<9>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().next().set<10>(biases);
+  net->next().next().next().set<10>(biases);
 
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().next().set<12>(conv_weights);
+  net->next().next().next().set<12>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().next().set<13>(biases);
+  net->next().next().next().set<13>(biases);
   
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().next().set<15>(conv_weights);
+  net->next().next().next().set<15>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().next().set<16>(biases);
+  net->next().next().next().set<16>(biases);
 
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().next().set<18>(conv_weights);
+  net->next().next().next().set<18>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().next().set<19>(biases);
+  net->next().next().next().set<19>(biases);
   
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().next().set<21>(conv_weights);
+  net->next().next().next().set<21>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().next().set<22>(biases);
+  net->next().next().next().set<22>(biases);
 
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().next().set<24>(conv_weights);
+  net->next().next().next().set<24>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().next().set<25>(biases);
+  net->next().next().next().set<25>(biases);
   
   conv_weights = { 0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random(),  0.5 * Eigen::Matrix<float, 16, 16>::Random() };
-  net->next().next().set<27>(conv_weights);
+  net->next().next().next().set<27>(conv_weights);
 
   biases = 0.5 * Eigen::Vector<float, LAYER_CHANNELS>::Random();
-  net->next().next().set<28>(biases);
+  net->next().next().next().set<28>(biases);
 
-  net->next().next().set<30>(0.5 * Eigen::Matrix<float, 1, 16>::Random());
+  net->next().next().next().set<30>(0.5 * Eigen::Matrix<float, 1, 16>::Random());
 }
 
 emscripten::val process_net(const emscripten::val &input, float bass, float mid, float treble)
