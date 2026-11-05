@@ -16,7 +16,7 @@ template<int Dilation, class NextOp>
 using Layer = Conv<Dilation, anna::op::vector_add<float, LAYER_CHANNELS, anna::op::leaky_relu<float, NextOp>>>;
 
 template<class NextOp>
-using Block = Layer<1, Layer<2, Layer<4, Layer<8, Layer<16, Layer<32, Layer<64, Layer<128, Layer<512, Layer<1024, NextOp>>>>>>>>>>;
+using Block = Layer<1, Layer<2, Layer<4, Layer<8, Layer<16, Layer<32, Layer<64, Layer<128, Layer<256, Layer<512, NextOp>>>>>>>>>>;
 
 template<class Op, class NextOp>
 using SkipConnection = anna::op::additive_shortcut<float, Op, NextOp>;
