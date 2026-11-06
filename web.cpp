@@ -13,25 +13,30 @@
 
 // Net *net = new Net;
 
-// TestNet net;
+// typedef anna::op::conv1d<float, 1, 1, 3, 12000, 1024, anna::op::leaky_relu<float, anna::op::output<float, 1, 1024>>> TestNet;
+typedef anna::op::additive_shortcut<float, anna::op::conv1d<float, 1, 1, 3, 12000, 1024, anna::op::output<float, 1, 1024>>, anna::op::conv1d<float, 1, 1, 3, 12000, 1024, anna::op::output<float, 1, 1024>>> TestNet;
+
+// TestNet *net = nullptr;
 Net *net = nullptr;
 
-void prepare_net(int seed)
+void prepare_net()
 {
 #include "model_weights.cpp"
-
-  /*
-  net = new TestNet;
-  net->set<0>(Eigen::Matrix<float, 16, 4>::Random());
-  net->set<2>(Eigen::Matrix<float, 1, 16>::Random());
-  */
-
-  srand(seed);
-
   if (net != nullptr) {
     delete net;
   }
-  
+
+  /*
+  net = new TestNet;
+
+  std::array<Eigen::Matrix<float, 1, 1>, 3> w;
+  w[0] << 1;
+  w[1] << 1;
+  w[2] << 1;
+  net->m_op.set<0>(w); 
+  net->next().set<0>(w);
+  */
+ 
   net = new Net;
 
   // INPUT EXPANDER
@@ -40,7 +45,7 @@ void prepare_net(int seed)
   net->set<1>(b0);
 
   // Block 1
-  
+  // net->next()->next() is the additive_shortcut. 
   net->next().next().m_op.set<0>(conv_weights1_1);
   net->next().next().m_op.set<1>(b1_1);
 
@@ -115,7 +120,8 @@ emscripten::val process_net(const emscripten::val &input, float bass, float mid,
   Eigen::Matrix<float, 4, 1024> minput;
 
   for (int col = 0; col < 1024; ++col) {
-    minput(0, col) = input_v[col];
+    minput(0, col) = (input_v[col] - 0.00007566602) / 0.056112118f;
+    
     minput(1, col) = bass;
     minput(2, col) = mid;
     minput(3, col) = treble;
@@ -126,7 +132,7 @@ emscripten::val process_net(const emscripten::val &input, float bass, float mid,
   emscripten::val output_js = emscripten::val::array();
 
   for (int index = 0; index < 1024; ++index) {
-    output_js.call<void>("push", net->end().m_input(0, index));
+    output_js.call<void>("push", (net->end().m_input(0, index) * 0.048887003f) + -0.000000053953258f);
     // output_js.call<void>("push", input_v[index]);
   }
   

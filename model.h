@@ -7,7 +7,7 @@
 #define MAX_PROCESS_SIZE 1024
 
 template<class NextOp>
-using Expand = anna::op::linear2<float, LAYER_CHANNELS, INPUT_CHANNELS, MAX_PROCESS_SIZE, anna::op::vector_add<float, 16, NextOp>>;
+using Expand = anna::op::linear2<float, LAYER_CHANNELS, INPUT_CHANNELS, MAX_PROCESS_SIZE, anna::op::vector_add<float, LAYER_CHANNELS, NextOp>>;
 
 template<int Dilation, class NextOp>
 using Conv = anna::op::conv1d<float, LAYER_CHANNELS, LAYER_CHANNELS, 3, Dilation, MAX_PROCESS_SIZE, NextOp>;

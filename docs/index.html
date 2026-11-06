@@ -7,17 +7,16 @@
 
   <input type="button" value="start" onclick="setup()" disabled id="start">
   <br>
-  <input type="range" min="0" max="1" step="0.001" value="0.5" id="input_gain"> input gain
+  <input type="range" min="0" max="1" step="0.001" value="1" id="input_gain"> input gain
   <br>
-  <input type="range" min="-1" max="1" step="0.01" id="bass"> bass
+  <input type="range" min="-1" max="1" step="0.01" id="bass" value="1"> bass
   <br>
-  <input type="range" min="-1" max="1" step="0.01" id="mid"> mid
+  <input type="range" min="-1" max="1" step="0.01" id="mid" value="1"> mid
   <br>
-  <input type="range" min="-1" max="1" step="0.01" id="treble"> treble
+  <input type="range" min="-1" max="1" step="0.01" id="treble" value="1"> treble
   <br>
   <input type="range" min="0" max="1" step="0.001" value="0.001"  id="output_gain"> output gain
   
-  <script src="web.js"></script>
   <script>
     a = new Float32Array(1024);
     
@@ -38,7 +37,7 @@
 
         console.log("prepare_net()");
         d = new Date;
-        Module.prepare_net(d.getMilliseconds());
+        Module.prepare_net();
         
         audioContext = new AudioContext();
         const input_audio = document.getElementById("input");
@@ -47,14 +46,14 @@
         var script_node = audioContext.createScriptProcessor(4096, 1, 1);
 
         script_node.addEventListener("audioprocess", (e) => {
-            const input_gain = document.getElementById("input_gain").value;
+            const input_gain = parseFloat(document.getElementById("input_gain").value);
             
-            const bass = document.getElementById("bass").value;
-            const mid = document.getElementById("mid").value;
-            const treble = document.getElementById("treble").value;
+            const bass = parseFloat(document.getElementById("bass").value);
+            const mid = parseFloat(document.getElementById("mid").value);
+            const treble = parseFloat(document.getElementById("treble").value);
             
             const output_gain = document.getElementById("output_gain").value;
-
+            
             // console.log("bass: " + bass + " mid: " + mid + " treble: " + treble);
             
             for (i = 0; i < 4096 / 1024; ++i) {
@@ -86,6 +85,8 @@
         }
     };
   </script>
+  
+  <script src="web.js"></script>
 </body>
 </html>
 
