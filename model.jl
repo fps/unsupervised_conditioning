@@ -43,6 +43,8 @@ LS = LogSpectrum.LogSpectrum(DSP.Windows.hann(m_amp_offset), 48000, 20, 10000, n
 
 epoch = 1
 
+losses = []
+
 @info "Done."
 
 # Flux.adjust!(opt[1], 2f-5)

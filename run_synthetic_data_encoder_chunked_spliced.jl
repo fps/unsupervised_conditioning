@@ -2,8 +2,6 @@
 
 # epoch = 1
 
-losses = []
-
 batchsize = 2^5
 
 sigreg_test_points = dev(Float32.(collect(range(-5, 5, 17))))
