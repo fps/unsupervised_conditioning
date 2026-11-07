@@ -7,9 +7,12 @@ encoder_activation = Flux.leakyrelu
 
 m_encoder = Flux.Chain(
     Flux.Dense(n_freqs => 64),
-    Flux.Dense(64 => 64, encoder_activation),
-    Flux.Dense(64 => 64, encoder_activation),
-    Flux.Dense(64 => 64, encoder_activation),
+    Flux.SkipConnection(
+        Flux.Chain(
+            Flux.Dense(64 => 64, encoder_activation),
+            Flux.Dense(64 => 64, encoder_activation),
+            Flux.Dense(64 => 64, encoder_activation),
+        ), (mx, x) -> mx .+ x),
     Flux.Dense(64 => 32, encoder_activation),
     Flux.Dense(32 => 16, encoder_activation),
     Flux.Dense(16 => 8, encoder_activation),

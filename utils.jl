@@ -7,6 +7,8 @@ function conv_weights_to_string(weights)
 end
 =#
 
+weights_string(m) = join(["$(Printf.@sprintf "%.25f" w)" for w in m], ", ")
+
 function write_model_weights(filename, m)
     open(filename, "w") do file;
         section = 0;

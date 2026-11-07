@@ -9,13 +9,13 @@
   <br>
   <input type="range" min="0" max="1" step="0.001" value="1" id="input_gain"> input gain
   <br>
-  <input type="range" min="-1" max="1" step="0.01" id="bass" value="1"> bass
+  <input type="range" min="-1" max="1" step="0.01" id="bass" value="0"> bass
   <br>
-  <input type="range" min="-1" max="1" step="0.01" id="mid" value="1"> mid
+  <input type="range" min="-1" max="1" step="0.01" id="mid" value="0"> mid
   <br>
-  <input type="range" min="-1" max="1" step="0.01" id="treble" value="1"> treble
+  <input type="range" min="-1" max="1" step="0.01" id="treble" value="0"> treble
   <br>
-  <input type="range" min="0" max="1" step="0.001" value="0.001"  id="output_gain"> output gain
+  <input type="range" min="0" max="1" step="0.001" id="output_gain" value="0.5"> output gain
   
   <script>
     a = new Float32Array(1024);
@@ -56,7 +56,7 @@
             
             // console.log("bass: " + bass + " mid: " + mid + " treble: " + treble);
             
-            for (i = 0; i < 4096 / 1024; ++i) {
+            for (i = 0; i < (4096 / 1024); ++i) {
                 for (j = 0; j < 1024; ++j) {
                     a[j] = input_gain * e.inputBuffer.getChannelData(0)[i * 1024 + j];
                 }
@@ -66,7 +66,7 @@
 
                 for (j = 0; j < 1024; ++j) {
                     e.outputBuffer.getChannelData(0)[i * 1024 + j] = output_gain * output[j];
-                    // e.outputBuffer.getChannelData(0)[i * 1024 + j] = gain * e.inputBuffer.getChannelData(0)[i * 1024 + j];
+                    // e.outputBuffer.getChannelData(0)[i * 1024 + j] = output_gain * e.inputBuffer.getChannelData(0)[i * 1024 + j];
                 }
             }
         });

@@ -132,7 +132,7 @@ emscripten::val process_net(const emscripten::val &input, float bass, float mid,
   emscripten::val output_js = emscripten::val::array();
 
   for (int index = 0; index < 1024; ++index) {
-    output_js.call<void>("push", (net->end().m_input(0, index) * 0.048887003f) + -0.000000053953258f);
+    output_js.call<void>("push", /* 0.1 * */ ((net->end().m_input(0, index) * 0.048887003f) + -0.000000053953258f) /* + input_v[index] */);
     // output_js.call<void>("push", input_v[index]);
   }
   
